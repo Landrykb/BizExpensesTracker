@@ -66,6 +66,35 @@
       <path d="M18.09 10.37A6 6 0 1 1 10.34 18"/>
       <path d="M7 6h1v4"/>
     </symbol>
+    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>
+      <path d="M9 22V12h6v10"/>
+    </symbol>
+    <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 6h13"/>
+      <path d="M8 12h13"/>
+      <path d="M8 18h13"/>
+      <path d="M3 6h.01"/>
+      <path d="M3 12h.01"/>
+      <path d="M3 18h.01"/>
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 5v14"/>
+      <path d="M5 12h14"/>
+    </symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/>
+      <path d="m21 21-4.3-4.3"/>
+    </symbol>
+    <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m22 2-7 20-4-9-9-4Z"/>
+      <path d="M22 2 11 13"/>
+    </symbol>
+    <symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+      <circle cx="9" cy="9" r="2"/>
+      <path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>
+    </symbol>
   </defs>
 </svg>
 
@@ -81,69 +110,213 @@
 </header>
 
 <main id="panel-main" hidden>
-  <!-- ============ Soldes par projet ============ -->
-  <section>
-    <div class="list-head">
-      <h2><svg class="ic"><use href="#i-scale"/></svg> Soldes par projet</h2>
-    </div>
-    <div id="project-list" class="card-list"></div>
-  </section>
 
-  <!-- ============ Ce mois ============ -->
-  <section>
-    <div class="list-head">
-      <h2><svg class="ic"><use href="#i-calendar"/></svg> Ce mois — <span id="month-ym"></span></h2>
-    </div>
-    <div class="stat-tiles">
-      <div class="stat-tile">
-        <span class="stat-label"><svg class="ic"><use href="#i-receipt"/></svg> Dépenses</span>
-        <span class="stat-value" id="month-dep"></span>
-        <span class="stat-sub" id="month-dep-n"></span>
+  <!-- ============ Vue d'ensemble (Accueil / Budget / Ce mois) ============ -->
+  <div class="view active" id="view-overview">
+    <section>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-calendar"/></svg> Ce mois — <span id="month-ym"></span></h2>
       </div>
-      <div class="stat-tile">
-        <span class="stat-label"><svg class="ic"><use href="#i-coins"/></svg> Apports</span>
-        <span class="stat-value" id="month-app"></span>
-        <span class="stat-sub" id="month-app-n"></span>
+      <div class="stat-tiles">
+        <div class="stat-tile">
+          <span class="stat-label"><svg class="ic"><use href="#i-receipt"/></svg> Dépenses</span>
+          <span class="stat-value" id="month-dep"></span>
+          <span class="stat-sub" id="month-dep-n"></span>
+        </div>
+        <div class="stat-tile">
+          <span class="stat-label"><svg class="ic"><use href="#i-coins"/></svg> Apports</span>
+          <span class="stat-value" id="month-app"></span>
+          <span class="stat-sub" id="month-app-n"></span>
+        </div>
       </div>
-    </div>
-  </section>
+      <p class="hint-note">Seules les écritures approuvées comptent — l'argent en attente ne bouge aucun chiffre.</p>
+    </section>
+
+    <section>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-scale"/></svg> Budget — soldes par projet</h2>
+      </div>
+      <div id="project-list" class="card-list"></div>
+      <div class="card totals-card">
+        <div class="row"><span class="row-label">Total apports</span>
+          <span class="row-value strong" id="tot-app"></span></div>
+        <div class="row"><span class="row-label">Total dépensé (tous projets)</span>
+          <span class="row-value strong" id="tot-dep"></span></div>
+        <div class="row"><span class="row-label">Solde global</span>
+          <span class="row-value strong" id="tot-solde"></span></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ Écritures (Récentes / Recherche / Sans justificatif / + Dépense / + Apport) ============ -->
+  <div class="view" id="view-entries">
+    <section>
+      <div class="create-row">
+        <button class="btn btn-create" id="btn-new-depense"><svg class="ic"><use href="#i-plus"/></svg> Dépense</button>
+        <button class="btn btn-create alt" id="btn-new-apport"><svg class="ic"><use href="#i-plus"/></svg> Apport</button>
+      </div>
+
+      <form id="form-depense" class="entry-form" hidden>
+        <h3><svg class="ic"><use href="#i-receipt"/></svg> Nouvelle dépense</h3>
+        <label>Montant (FCFA)
+          <input id="fd-amount" type="number" inputmode="numeric" min="1" placeholder="ex. 15 000" required>
+        </label>
+        <label>Libellé
+          <input id="fd-desc" type="text" maxlength="200" placeholder="Décris la dépense en une ligne" required>
+        </label>
+        <label>Projet
+          <select id="fd-project"></select>
+        </label>
+        <label>Catégorie
+          <select id="fd-category"></select>
+        </label>
+        <label>Qui a payé ?
+          <select id="fd-payer"></select>
+        </label>
+        <label id="fd-funder-wrap" hidden>Financé par qui ?
+          <select id="fd-funder"></select>
+        </label>
+        <label>Méthode de paiement
+          <select id="fd-method"></select>
+        </label>
+        <p class="hint-note">À l'envoi, la dépense part <strong>en attente</strong> : un second membre
+        devra l'approuver. Le bot te demandera ensuite la photo du justificatif dans le chat —
+        une seule photo, rien d'autre à faire.</p>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" data-close-form>Annuler</button>
+          <button type="submit" class="btn btn-approve">Enregistrer</button>
+        </div>
+      </form>
+
+      <form id="form-apport" class="entry-form" hidden>
+        <h3><svg class="ic"><use href="#i-coins"/></svg> Nouvel apport</h3>
+        <label>Montant (FCFA)
+          <input id="fa-amount" type="number" inputmode="numeric" min="1" placeholder="ex. 50 000" required>
+        </label>
+        <label>Projet
+          <select id="fa-project"></select>
+        </label>
+        <label>Méthode
+          <select id="fa-method"></select>
+        </label>
+        <p class="hint-note">L'apport est saisi à ton nom et part <strong>en attente</strong> :
+        un second membre devra l'approuver pour qu'il compte dans les participations.</p>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" data-close-form>Annuler</button>
+          <button type="submit" class="btn btn-approve">Enregistrer</button>
+        </div>
+      </form>
+    </section>
+
+    <section>
+      <div class="search-box">
+        <svg class="ic"><use href="#i-search"/></svg>
+        <input id="search-input" type="search" placeholder="Chercher une dépense (mot-clé, projet, payeur…)">
+      </div>
+      <div class="chips" id="filter-chips">
+        <button class="chip active" data-filter="all">Toutes</button>
+        <button class="chip" data-filter="depenses">Dépenses</button>
+        <button class="chip" data-filter="apports">Apports</button>
+        <button class="chip" data-filter="missing">🧾 Sans justificatif</button>
+      </div>
+      <p class="hint-note" id="search-scope"></p>
+      <div class="card">
+        <div id="recent-list"></div>
+        <div id="recent-apports-wrap" hidden>
+          <h3 class="card-title">Derniers apports</h3>
+          <div id="recent-apports"></div>
+        </div>
+        <div id="missing-wrap" hidden>
+          <h3 class="card-title">Sans justificatif</h3>
+          <div id="missing-list"></div>
+        </div>
+        <p class="entry-meta pad" id="entries-empty" hidden>Aucune écriture ne correspond.</p>
+      </div>
+    </section>
+  </div>
 
   <!-- ============ En attente d'approbation ============ -->
-  <section>
-    <div class="list-head">
-      <h2><svg class="ic"><use href="#i-clock"/></svg> En attente d'approbation</h2>
-      <span id="pending-count" class="count-pill"></span>
-    </div>
-    <div id="pending-list" class="card-list"></div>
-    <div id="pending-empty" class="empty-note" hidden>
-      <p><strong>Rien en attente.</strong> Toutes les dépenses sont décidées. ✅</p>
-    </div>
-  </section>
-
-  <!-- ============ Dernières écritures ============ -->
-  <section>
-    <div class="list-head">
-      <h2><svg class="ic"><use href="#i-chart"/></svg> Dernières écritures</h2>
-    </div>
-    <div class="card">
-      <div id="recent-list"></div>
-      <div id="recent-apports-wrap" hidden>
-        <h3 class="card-title">Derniers apports</h3>
-        <div id="recent-apports"></div>
+  <div class="view" id="view-pending">
+    <section>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-clock"/></svg> En attente d'approbation</h2>
+        <span id="pending-count" class="count-pill"></span>
       </div>
-    </div>
-  </section>
+      <p class="hint-note">Règle des deux personnes : chaque écriture est validée par un second
+      membre — jamais par celui qui a payé ni par celui qui l'a saisie. La première décision est finale.</p>
+      <div id="pending-list" class="card-list"></div>
+      <div id="pending-empty" class="empty-note" hidden>
+        <p><strong>Rien en attente.</strong> Toutes les écritures sont décidées. ✅</p>
+      </div>
+    </section>
+  </div>
 
-  <!-- ============ Par membre ============ -->
-  <section>
-    <div class="list-head">
-      <h2><svg class="ic"><use href="#i-users"/></svg> Par membre — total apporté</h2>
-    </div>
-    <div class="card">
-      <div id="member-list"></div>
-    </div>
-  </section>
+  <!-- ============ Membres (Par membre / Participations) ============ -->
+  <div class="view" id="view-members">
+    <section>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-users"/></svg> Par membre — total apporté</h2>
+      </div>
+      <div class="card">
+        <div id="member-list"></div>
+      </div>
+      <p class="hint-note">La carte d'un membre (image) peut être envoyée dans le chat avec le bouton 📸.</p>
+    </section>
+    <section id="participations-wrap" hidden>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-scale"/></svg> Participations — écarts</h2>
+      </div>
+      <div class="card">
+        <div id="participations-list"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ Graphiques ============ -->
+  <div class="view" id="view-charts">
+    <section>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-chart"/></svg> Dépenses par catégorie</h2>
+      </div>
+      <div class="card chart-card" id="chart-category"></div>
+    </section>
+    <section>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-chart"/></svg> Dépenses par projet</h2>
+      </div>
+      <div class="card chart-card" id="chart-project"></div>
+    </section>
+    <section>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-calendar"/></svg> Tendance — dépenses par mois</h2>
+      </div>
+      <div class="card chart-card" id="chart-months"></div>
+    </section>
+    <section>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-image"/></svg> Recevoir les cartes en image</h2>
+      </div>
+      <div class="card">
+        <p class="hint-note">Les mêmes images que le /voir du bot, envoyées dans ta conversation :</p>
+        <div class="send-list">
+          <button class="btn btn-send" data-chart="dashboard">📈 Tableau de bord</button>
+          <button class="btn btn-send" data-chart="pilotage">🧭 Pilotage</button>
+          <button class="btn btn-send" data-chart="startup">🚀 Vue startup</button>
+        </div>
+        <h3 class="card-title">Cartes par projet</h3>
+        <div class="send-list" id="project-cards"></div>
+      </div>
+    </section>
+  </div>
 </main>
+
+<nav id="tabbar" hidden>
+  <button class="tab active" data-view="overview"><svg class="ic"><use href="#i-home"/></svg><span>Accueil</span></button>
+  <button class="tab" data-view="entries"><svg class="ic"><use href="#i-list"/></svg><span>Écritures</span></button>
+  <button class="tab" data-view="pending"><svg class="ic"><use href="#i-clock"/></svg><span>Attente</span><span class="tab-badge" id="tab-pending-badge" hidden></span></button>
+  <button class="tab" data-view="members"><svg class="ic"><use href="#i-users"/></svg><span>Membres</span></button>
+  <button class="tab" data-view="charts"><svg class="ic"><use href="#i-chart"/></svg><span>Graphes</span></button>
+</nav>
 
 <div id="panel-empty" class="empty-note" hidden>
   <svg class="ic lg"><use href="#i-shield"/></svg>
