@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BizExpensesTracker — Panneau du registre</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- ===== Inline SVG icon set (no external assets) ===== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-wallet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/>
+      <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/>
+      <path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>
+    </symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 3v18h18"/>
+      <path d="M18 17V9"/>
+      <path d="M13 17V5"/>
+      <path d="M8 17v-3"/>
+    </symbol>
+    <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 6v6l4 2"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 6 9 17l-5-5"/>
+    </symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 6 6 18"/>
+      <path d="m6 6 12 12"/>
+    </symbol>
+    <symbol id="i-receipt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/>
+      <path d="M8 8h8"/>
+      <path d="M8 12h8"/>
+    </symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2"/>
+      <path d="M16 2v4"/>
+      <path d="M8 2v4"/>
+      <path d="M3 10h18"/>
+    </symbol>
+    <symbol id="i-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3v18"/>
+      <path d="M5 7l7-4 7 4"/>
+      <path d="M3 13l2-6 2 6a3.5 3.5 0 0 1-4 0Z"/>
+      <path d="M17 13l2-6 2 6a3.5 3.5 0 0 1-4 0Z"/>
+      <path d="M8 21h8"/>
+    </symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    </symbol>
+    <symbol id="i-coins" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="8" cy="8" r="6"/>
+      <path d="M18.09 10.37A6 6 0 1 1 10.34 18"/>
+      <path d="M7 6h1v4"/>
+    </symbol>
+    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>
+      <path d="M9 22V12h6v10"/>
+    </symbol>
+    <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 6h13"/>
+      <path d="M8 12h13"/>
+      <path d="M8 18h13"/>
+      <path d="M3 6h.01"/>
+      <path d="M3 12h.01"/>
+      <path d="M3 18h.01"/>
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 5v14"/>
+      <path d="M5 12h14"/>
+    </symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/>
+      <path d="m21 21-4.3-4.3"/>
+    </symbol>
+    <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m22 2-7 20-4-9-9-4Z"/>
+      <path d="M22 2 11 13"/>
+    </symbol>
+    <symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+      <circle cx="9" cy="9" r="2"/>
+      <path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="app-header">
+  <div class="brand">
+    <span class="brand-icon"><svg class="ic"><use href="#i-wallet"/></svg></span>
+    <div class="brand-text">
+      <h1 id="brand-name">BizExpensesTracker</h1>
+      <p id="scope-line">Registre des dépenses</p>
+    </div>
+  </div>
+  <span id="demo-badge" class="demo-badge" hidden>Données de démo</span>
+</header>
+
+<main id="panel-main" hidden>
+
+  <!-- ============ Vue d'ensemble (Accueil / Budget / Ce mois) ============ -->
+  <div class="view active" id="view-overview">
+    <section id="teams-wrap" hidden>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-users"/></svg> Mes équipes</h2>
+      </div>
+      <div class="card">
+        <div id="teams-list"></div>
+        <p class="hint-note">Le panneau affiche une équipe à la fois. Toucher une autre
+        équipe demande au bot un panneau chargé pour elle — il arrive dans le chat,
+        et ton choix est gardé pour la suite.</p>
+      </div>
+    </section>
+
+    <!-- Financement (Stage 2, latent): this section stays hidden
+         unless the snapshot carries a `growth` block — i.e. unless
+         the register's « Financement » tab holds a real round. -->
+    <section id="growth-wrap" hidden>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-coins"/></svg> Financement</h2>
+      </div>
+      <div class="card">
+        <div id="growth-list"></div>
+        <div class="row"><span class="row-label">Total levé</span>
+          <span class="row-value strong" id="growth-total"></span></div>
+        <div class="row"><span class="row-label">dont externe</span>
+          <span class="row-value" id="growth-external"></span></div>
+        <div class="row"><span class="row-label">Détenteurs au capital</span>
+          <span class="row-value" id="growth-holders"></span></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-calendar"/></svg> Ce mois — <span id="month-ym"></span></h2>
+      </div>
+      <div class="stat-tiles">
+        <div class="stat-tile">
+          <span class="stat-label"><svg class="ic"><use href="#i-receipt"/></svg> Dépenses</span>
+          <span class="stat-value" id="month-dep"></span>
+          <span class="stat-sub" id="month-dep-n"></span>
+        </div>
+        <div class="stat-tile">
+          <span class="stat-label"><svg class="ic"><use href="#i-coins"/></svg> Apports</span>
+          <span class="stat-value" id="month-app"></span>
+          <span class="stat-sub" id="month-app-n"></span>
+        </div>
+      </div>
+      <p class="hint-note">Seules les écritures approuvées comptent — l'argent en attente ne bouge aucun chiffre.</p>
+    </section>
+
+    <section>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-scale"/></svg> Budget — soldes par projet</h2>
+      </div>
+      <div id="project-list" class="card-list"></div>
+      <div class="card totals-card">
+        <div class="row"><span class="row-label">Total apports</span>
+          <span class="row-value strong" id="tot-app"></span></div>
+        <div class="row"><span class="row-label">Total dépensé (tous projets)</span>
+          <span class="row-value strong" id="tot-dep"></span></div>
+        <div class="row"><span class="row-label">Solde global</span>
+          <span class="row-value strong" id="tot-solde"></span></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ Écritures (Récentes / Recherche / Sans justificatif / + Dépense / + Apport) ============ -->
+  <div class="view" id="view-entries">
+    <section>
+      <div class="create-row">
+        <button class="btn btn-create" id="btn-new-depense"><svg class="ic"><use href="#i-plus"/></svg> Dépense</button>
+        <button class="btn btn-create alt" id="btn-new-apport"><svg class="ic"><use href="#i-plus"/></svg> Apport</button>
+      </div>
+
+      <form id="form-depense" class="entry-form" hidden>
+        <h3><svg class="ic"><use href="#i-receipt"/></svg> Nouvelle dépense</h3>
+        <label>Montant (FCFA)
+          <input id="fd-amount" type="number" inputmode="numeric" min="1" placeholder="ex. 15 000" required>
+        </label>
+        <label>Libellé
+          <input id="fd-desc" type="text" maxlength="200" placeholder="Décris la dépense en une ligne" required>
+        </label>
+        <label>Projet
+          <select id="fd-project"></select>
+        </label>
+        <label>Catégorie
+          <select id="fd-category"></select>
+        </label>
+        <label>Qui a payé ?
+          <select id="fd-payer"></select>
+        </label>
+        <label id="fd-funder-wrap" hidden>Financé par qui ?
+          <select id="fd-funder"></select>
+        </label>
+        <label>Méthode de paiement
+          <select id="fd-method"></select>
+        </label>
+        <p class="hint-note">À l'envoi, la dépense part <strong>en attente</strong> : un second membre
+        devra l'approuver. Le bot te demandera ensuite la photo du justificatif dans le chat —
+        une seule photo, rien d'autre à faire.</p>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" data-close-form>Annuler</button>
+          <button type="submit" class="btn btn-approve">Enregistrer</button>
+        </div>
+      </form>
+
+      <form id="form-apport" class="entry-form" hidden>
+        <h3><svg class="ic"><use href="#i-coins"/></svg> Nouvel apport</h3>
+        <label>Montant (FCFA)
+          <input id="fa-amount" type="number" inputmode="numeric" min="1" placeholder="ex. 50 000" required>
+        </label>
+        <label>Projet
+          <select id="fa-project"></select>
+        </label>
+        <label>Méthode
+          <select id="fa-method"></select>
+        </label>
+        <p class="hint-note">L'apport est saisi à ton nom et part <strong>en attente</strong> :
+        un second membre devra l'approuver pour qu'il compte dans les participations.</p>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" data-close-form>Annuler</button>
+          <button type="submit" class="btn btn-approve">Enregistrer</button>
+        </div>
+      </form>
+    </section>
+
+    <section>
+      <div class="search-box">
+        <svg class="ic"><use href="#i-search"/></svg>
+        <input id="search-input" type="search" placeholder="Chercher une dépense (mot-clé, projet, payeur…)">
+      </div>
+      <div class="chips" id="filter-chips">
+        <button class="chip active" data-filter="all">Toutes</button>
+        <button class="chip" data-filter="depenses">Dépenses</button>
+        <button class="chip" data-filter="apports">Apports</button>
+        <button class="chip" data-filter="missing">🧾 Sans justificatif</button>
+      </div>
+      <p class="hint-note" id="search-scope"></p>
+      <div class="card">
+        <div id="recent-list"></div>
+        <div id="recent-apports-wrap" hidden>
+          <h3 class="card-title">Derniers apports</h3>
+          <div id="recent-apports"></div>
+        </div>
+        <div id="missing-wrap" hidden>
+          <h3 class="card-title">Sans justificatif</h3>
+          <div id="missing-list"></div>
+        </div>
+        <p class="entry-meta pad" id="entries-empty" hidden>Aucune écriture ne correspond.</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ En attente d'approbation ============ -->
+  <div class="view" id="view-pending">
+    <section>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-clock"/></svg> En attente d'approbation</h2>
+        <span id="pending-count" class="count-pill"></span>
+      </div>
+      <p class="hint-note">Règle des deux personnes : chaque écriture est validée par un second
+      membre — jamais par celui qui a payé ni par celui qui l'a saisie. La première décision est finale.</p>
+      <div id="pending-list" class="card-list"></div>
+      <div id="pending-empty" class="empty-note" hidden>
+        <p><strong>Rien en attente.</strong> Toutes les écritures sont décidées. ✅</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ Membres (Par membre / Participations) ============ -->
+  <div class="view" id="view-members">
+    <section>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-users"/></svg> Par membre — total apporté</h2>
+      </div>
+      <div class="card">
+        <div id="member-list"></div>
+      </div>
+      <p class="hint-note">« Voir la carte » affiche la carte d'un membre ici même.
+      Sur la carte, « Envoyer dans le chat » la poste aussi en image dans ta conversation.</p>
+    </section>
+    <section id="participations-wrap" hidden>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-scale"/></svg> Participations — par projet</h2>
+      </div>
+      <div class="card">
+        <div id="participations-list"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ Graphiques ============ -->
+  <div class="view" id="view-charts">
+    <section>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-chart"/></svg> Dépenses par catégorie</h2>
+      </div>
+      <div class="card chart-card" id="chart-category"></div>
+    </section>
+    <section>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-chart"/></svg> Dépenses par projet</h2>
+      </div>
+      <div class="card chart-card" id="chart-project"></div>
+    </section>
+    <section>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-calendar"/></svg> Tendance — dépenses par mois</h2>
+      </div>
+      <div class="card chart-card" id="chart-months"></div>
+    </section>
+    <section>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-image"/></svg> Cartes du registre</h2>
+      </div>
+      <div class="card">
+        <p class="hint-note">Touche une carte pour l'afficher ici même. Sur la carte,
+        « Envoyer dans le chat » la poste aussi en image dans ta conversation —
+        les mêmes images que le /voir du bot.</p>
+        <div class="send-list">
+          <button class="btn btn-send" data-chart="dashboard">📈 Tableau de bord</button>
+          <button class="btn btn-send" data-chart="pilotage">🧭 Pilotage</button>
+          <button class="btn btn-send" data-chart="startup">🔥 Vue startup</button>
+        </div>
+        <h3 class="card-title">Cartes par projet</h3>
+        <div class="send-list" id="project-cards"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ Carte affichée dans le panneau ============
+       Member / project / dashboard / pilotage / startup cards open
+       HERE (Landry, 2026-11-06: requested from the panel ->
+       displayed in the panel), rendered natively from the snapshot.
+       The foot button is the explicit chat delivery: the bot posts
+       the same card as an image in the DM (send_chart). -->
+  <div class="view" id="view-card">
+    <section>
+      <div class="list-head">
+        <button class="btn btn-mini" id="card-back">← Retour</button>
+        <h2 id="card-title"></h2>
+      </div>
+      <div class="card" id="card-body"></div>
+      <div class="send-list">
+        <button class="btn btn-send" id="card-send"><svg class="ic"><use href="#i-send"/></svg> Envoyer dans le chat</button>
+      </div>
+      <p class="hint-note" id="card-note"></p>
+    </section>
+  </div>
+</main>
+
+<nav id="tabbar" hidden>
+  <button class="tab active" data-view="overview"><svg class="ic"><use href="#i-home"/></svg><span>Accueil</span></button>
+  <button class="tab" data-view="entries"><svg class="ic"><use href="#i-list"/></svg><span>Écritures</span></button>
+  <button class="tab" data-view="pending"><svg class="ic"><use href="#i-clock"/></svg><span>Attente</span><span class="tab-badge" id="tab-pending-badge" hidden></span></button>
+  <button class="tab" data-view="members"><svg class="ic"><use href="#i-users"/></svg><span>Membres</span></button>
+  <button class="tab" data-view="charts"><svg class="ic"><use href="#i-chart"/></svg><span>Graphes</span></button>
+</nav>
+
+<div id="panel-empty" class="empty-note" hidden>
+  <svg class="ic lg"><use href="#i-shield"/></svg>
+  <p><strong>Panneau réservé aux membres du registre.</strong></p>
+  <p>Ouvre ce panneau depuis <strong>/start</strong> ou <strong>/voir</strong>
+  dans ta conversation privée avec <strong>@bizexpensestracker_bot</strong> —
+  c'est le bot qui charge les chiffres, signés et à jour.</p>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
