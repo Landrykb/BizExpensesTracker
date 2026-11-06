@@ -1,7 +1,9 @@
 /* BizExpensesTracker Mini App — styled from Telegram theme params,
    so it follows the user's Telegram theme (light & dark) automatically.
-   Brand accents use Food Haxun green (chart.py: GREEN #2e7d32,
-   DGREEN #1b5e20), matching the bot's cards and dashboard images. */
+   The --green defaults below ARE Food Haxun's theme set (chart.py:
+   GREEN #2e7d32, DGREEN #1b5e20); app.js applyTheme() overrides
+   them per scope from the snapshot's theme block (per-team themes),
+   so another team sees its own name and colours. */
 
 :root {
   --bg: var(--tg-theme-bg-color, #ffffff);

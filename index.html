@@ -102,8 +102,8 @@
   <div class="brand">
     <span class="brand-icon"><svg class="ic"><use href="#i-wallet"/></svg></span>
     <div class="brand-text">
-      <h1>BizExpensesTracker</h1>
-      <p>Registre des dépenses — Food Haxun</p>
+      <h1 id="brand-name">BizExpensesTracker</h1>
+      <p id="scope-line">Registre des dépenses</p>
     </div>
   </div>
   <span id="demo-badge" class="demo-badge" hidden>Données de démo</span>
@@ -113,6 +113,36 @@
 
   <!-- ============ Vue d'ensemble (Accueil / Budget / Ce mois) ============ -->
   <div class="view active" id="view-overview">
+    <section id="teams-wrap" hidden>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-users"/></svg> Mes équipes</h2>
+      </div>
+      <div class="card">
+        <div id="teams-list"></div>
+        <p class="hint-note">Le panneau affiche une équipe à la fois. Toucher une autre
+        équipe demande au bot un panneau chargé pour elle — il arrive dans le chat,
+        et ton choix est gardé pour la suite.</p>
+      </div>
+    </section>
+
+    <!-- Financement (Stage 2, latent): this section stays hidden
+         unless the snapshot carries a `growth` block — i.e. unless
+         the register's « Financement » tab holds a real round. -->
+    <section id="growth-wrap" hidden>
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-coins"/></svg> Financement</h2>
+      </div>
+      <div class="card">
+        <div id="growth-list"></div>
+        <div class="row"><span class="row-label">Total levé</span>
+          <span class="row-value strong" id="growth-total"></span></div>
+        <div class="row"><span class="row-label">dont externe</span>
+          <span class="row-value" id="growth-external"></span></div>
+        <div class="row"><span class="row-label">Détenteurs au capital</span>
+          <span class="row-value" id="growth-holders"></span></div>
+      </div>
+    </section>
+
     <section>
       <div class="list-head">
         <h2><svg class="ic"><use href="#i-calendar"/></svg> Ce mois — <span id="month-ym"></span></h2>
@@ -260,7 +290,8 @@
       <div class="card">
         <div id="member-list"></div>
       </div>
-      <p class="hint-note">La carte d'un membre (image) peut être envoyée dans le chat avec le bouton 📸.</p>
+      <p class="hint-note">« Voir la carte » affiche la carte d'un membre ici même.
+      Sur la carte, « Envoyer dans le chat » la poste aussi en image dans ta conversation.</p>
     </section>
     <section id="participations-wrap" hidden>
       <div class="list-head">
@@ -294,10 +325,12 @@
     </section>
     <section>
       <div class="list-head">
-        <h2><svg class="ic"><use href="#i-image"/></svg> Recevoir les cartes en image</h2>
+        <h2><svg class="ic"><use href="#i-image"/></svg> Cartes du registre</h2>
       </div>
       <div class="card">
-        <p class="hint-note">Les mêmes images que le /voir du bot, envoyées dans ta conversation :</p>
+        <p class="hint-note">Touche une carte pour l'afficher ici même. Sur la carte,
+        « Envoyer dans le chat » la poste aussi en image dans ta conversation —
+        les mêmes images que le /voir du bot.</p>
         <div class="send-list">
           <button class="btn btn-send" data-chart="dashboard">📈 Tableau de bord</button>
           <button class="btn btn-send" data-chart="pilotage">🧭 Pilotage</button>
@@ -306,6 +339,26 @@
         <h3 class="card-title">Cartes par projet</h3>
         <div class="send-list" id="project-cards"></div>
       </div>
+    </section>
+  </div>
+
+  <!-- ============ Carte affichée dans le panneau ============
+       Member / project / dashboard / pilotage / startup cards open
+       HERE (Landry, 2026-11-06: requested from the panel ->
+       displayed in the panel), rendered natively from the snapshot.
+       The foot button is the explicit chat delivery: the bot posts
+       the same card as an image in the DM (send_chart). -->
+  <div class="view" id="view-card">
+    <section>
+      <div class="list-head">
+        <button class="btn btn-mini" id="card-back">← Retour</button>
+        <h2 id="card-title"></h2>
+      </div>
+      <div class="card" id="card-body"></div>
+      <div class="send-list">
+        <button class="btn btn-send" id="card-send"><svg class="ic"><use href="#i-send"/></svg> Envoyer dans le chat</button>
+      </div>
+      <p class="hint-note" id="card-note"></p>
     </section>
   </div>
 </main>
