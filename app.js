@@ -245,6 +245,12 @@ function sendAction(action, params) {
     /* Raw initData so the bot can HMAC-validate the sender (a registered
      * member) before applying anything — see INTEGRATION.md §4. */
     init_data: tg ? tg.initData : "",
+    /* The signed scope claim from THIS panel's snapshot (`sc`): the bot
+     * verifies it and runs the action in the group this panel is
+     * showing (team register by default; the origin group when the
+     * panel was opened from that group's door). Without it the bot
+     * falls back to the team scope. */
+    scope_claim: panel && panel.sc ? panel.sc : "",
   });
   if (DEMO) {
     console.log("[demo] sendData:", JSON.stringify(payload));
