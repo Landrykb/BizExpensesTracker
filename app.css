@@ -78,6 +78,14 @@ section { margin-bottom: 20px; }
   color: var(--sec-header); padding: 12px 0 2px;
 }
 
+/* participations: one labelled block per project + the global block */
+.part-block + .part-block { margin-top: 10px; }
+.part-title {
+  font-size: 13.5px; font-weight: 650; color: var(--text);
+  padding: 10px 0 0;
+}
+.part-block:first-child .part-title { padding-top: 4px; }
+
 .proj-card, .pending-card {
   background: var(--sec-bg); border-radius: var(--radius); padding: 12px 14px;
 }
@@ -101,6 +109,10 @@ section { margin-bottom: 20px; }
 }
 .st-pos { color: var(--green-dark); background: rgba(46, 125, 50, 0.14); }
 .st-neg { color: #b3261e; background: rgba(255, 59, 48, 0.13); }
+/* Neutral reference pill (participations écarts): a muted repère,
+   never a verdict colour. */
+.pill-ref { color: var(--hint); background: var(--sec-bg); }
+.part-facts { display: block; margin: 2px 0 6px; }
 
 /* ---------- month tiles ---------- */
 .stat-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

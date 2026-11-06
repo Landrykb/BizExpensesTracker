@@ -147,8 +147,18 @@ const MOCK_PANEL = {
   ],
   missing_count: 3,
   participations: [
-    { name: "Landry", apporte: 648000, ecart: -24339 },
-    { name: "Dimas", apporte: 500000, ecart: 10000 },
+    { j: "Food Haxun — Tokyo8 (sous-projet clos)", r: 1, p: [1, 0, 1, 1],
+      a: [100000, 0, 15000, 110000], c: [75000, 0, 75000, 75000],
+      e: [0, 0, 0, 0], d: 222240, s: 2760 },
+    { j: "Food Haxun — Déploiement de l'app",
+      a: [6480, 0, 63550, 53250], e: [-24340, -30820, 32730, 22430],
+      d: 31780, s: 91500 },
+    { j: "Food Haxun", v: 1, f: 105000,
+      a: [0, 0, 0, 0], c: [26250, 26250, 26250, 26250],
+      e: [0, 0, 0, 0], d: 102500, s: 2500 },
+    { j: null,
+      a: [132730, 26250, 104800, 189500], e: [-24340, -30820, 32730, 22430],
+      d: 356520, s: 96760, w: [26250, 26250, 26250, 26250] },
   ],
   form_options: {
     projects: ["Food Haxun", "Nonvi Honton", "Commun"],
@@ -578,7 +588,9 @@ function renderMembers() {
     '<div class="row entry-row">' +
       '<div class="entry-main">' +
         '<span class="entry-line">' + esc(m.name) + "</span>" +
-        '<span class="entry-meta">Apports ' + esc(fmtMoney(m.apports)) + " · payé " + esc(fmtMoney(m.depenses_payees)) +
+        '<span class="entry-meta">Apports ' + esc(fmtMoney(m.apports)) +
+          (m.prov ? " · dont " + esc(fmtMoney(m.prov)) + " provisoire (2023)" : "") +
+          " · payé " + esc(fmtMoney(m.depenses_payees)) +
           " · " + m.nb_depenses + " dépense(s)</span>" +
         '<span class="entry-actions mini"><button class="btn btn-mini" data-member-card="' +
           esc(m.name) + '">' + icon("image") + " Carte PNG</button></span>" +
@@ -591,17 +603,72 @@ function renderMembers() {
       sendAction("send_chart", { chart: "membre", name: b.getAttribute("data-member-card") }));
   });
 
+  /* Participations: one LABELLED block per governed project, then
+   * the governed-total block (j === null, « Projets suivis »).
+   * "a"/"e" are parallel arrays in MEMBERS order — names come from
+   * panel.members, same order. Every block is computed bot-side
+   * from the register's apport rows (core.participations_breakdown),
+   * never from the sheet's old single-project tab.
+   * Framing (Landry, 2026-11-06): this is an EXPENSE tracker, not
+   * a contributors' ranking — each block LEADS with the project's
+   * expense facts (dépenses · apporté · solde), member lines stay
+   * factual (« a apporté X »), and the écart is a NEUTRAL reference
+   * (pill-ref), never a red/green verdict chip. A settled block
+   * (r = 1, Tokyo8) credits each participant the equal share
+   * ("c") with écart 0 and skips non-participants ("p" mask).
+   * A PROVISIONAL block (v = 1, the 2023 self-crowdfunding) leads
+   * with its FINANCEMENT ("f"), credits each member the provisional
+   * equal share ("c", 26 250) with écart 0, and is labelled
+   * « provisoire » — a placeholder, never « réglé »; the total
+   * block's "w" shows each member's provisional part of his total. */
   const parts = panel.participations || [];
   els.partWrap.hidden = !parts.length;
-  els.partList.innerHTML = parts.map((p) =>
-    '<div class="row entry-row">' +
-      '<div class="entry-main">' +
-        '<span class="entry-line">' + esc(p.name) + "</span>" +
-        '<span class="entry-meta">Apporté ' + esc(fmtMoney(p.apporte)) + "</span>" +
-      "</div>" +
-      '<span class="pill ' + (p.ecart < 0 ? "st-neg" : "st-pos") + '">' + esc(fmtMoney(p.ecart)) + "</span>" +
-    "</div>"
-  ).join("");
+  els.partList.innerHTML = parts.map((b) => {
+    const title = b.j
+      ? "Participations — " + esc(b.j) + (b.r ? " · réglé" : "") +
+        (b.v ? " · provisoire" : "")
+      : "Participations — Projets suivis";
+    const totalA = (b.a || []).reduce((s, v) => s + (v || 0), 0);
+    const facts = b.v
+      ? '<div class="entry-meta part-facts">Dépenses ' +
+        esc(fmtMoney(b.d || 0)) + " · Financement " +
+        esc(fmtMoney(b.f || 0)) + " · Solde " +
+        esc(fmtMoney(b.s || 0)) + "</div>"
+      : '<div class="entry-meta part-facts">Dépenses ' +
+        esc(fmtMoney(b.d || 0)) + " · Apporté " + esc(fmtMoney(totalA)) +
+        " · Solde " + esc(fmtMoney(b.s || 0)) + "</div>";
+    const rows = (b.a || []).map((apporte, i) => {
+      if (b.p && !b.p[i]) return "";
+      const ecart = (b.e || [])[i] || 0;
+      const name = (panel.members[i] || {}).name || "";
+      let meta;
+      if (b.v) {
+        meta = "part provisoire créditée " +
+          esc(fmtMoney((b.c || [])[i] || 0)) +
+          (apporte ? " · a apporté " + esc(fmtMoney(apporte)) : "");
+      } else {
+        meta = "a apporté " + esc(fmtMoney(apporte)) +
+          (b.r ? " · part égale " + esc(fmtMoney((b.c || [])[i] || 0)) : "") +
+          (!b.j && b.w && b.w[i] ? " · dont " +
+            esc(fmtMoney(b.w[i])) + " provisoire (2023)" : "");
+      }
+      return '<div class="row entry-row">' +
+        '<div class="entry-main">' +
+          '<span class="entry-line">' + esc(name) + "</span>" +
+          '<span class="entry-meta">' + meta + "</span>" +
+        "</div>" +
+        '<span class="pill pill-ref" title="Écart — repère">' +
+          esc(fmtMoney(ecart)) + "</span>" +
+      "</div>";
+    }).join("");
+    const note = b.v
+      ? '<p class="entry-meta pad">Attribution provisoire, en parts ' +
+        "égales — elle sera confirmée à partir des relevés de " +
+        "transactions.</p>"
+      : "";
+    return '<div class="part-block"><h4 class="part-title">' + title +
+      "</h4>" + facts + rows + note + "</div>";
+  }).join("");
 }
 
 /* -------------------------------------------------------------- graphiques */
