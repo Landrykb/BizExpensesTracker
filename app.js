@@ -3,10 +3,10 @@
  * Multi-view, self-contained panel (Landry, 2026-11-06): every bot
  * capability operates ON this screen — no "go type in the chat"
  * detours. Views: Accueil (vue d'ensemble / budget / ce mois),
- * Écritures (récentes + recherche + sans justificatif + formulaires
+ * Mouvements (récentes + recherche + sans justificatif + formulaires
  * ＋ Dépense / ＋ Apport), En attente (approbations), Membres (par
- * membre + participations), Graphes (graphiques + cartes), Carte
- * (une carte affichée dans le panneau).
+ * membre + participations), Graphes (graphiques + résumés), Résumé
+ * (un résumé affiché dans le panneau).
  *
  * Display rule (Landry, 2026-11-06): what is requested FROM the
  * panel is DISPLAYED in the panel — member, project, dashboard,
@@ -318,7 +318,7 @@ function sendAction(action, params) {
  * request vanished on 2026-11-06. In that state the button explains
  * in-app instead of pretending to send. */
 const CHAT_GATE_MSG =
-  "Ouvre le panneau depuis le chat du bot pour recevoir la carte dans le chat";
+  "Ouvre le panneau depuis le chat du bot pour recevoir l'image dans le chat";
 
 function deliverToChat(action, params, sentMsg) {
   if (DEMO) {
@@ -751,7 +751,7 @@ function renderMembers() {
           " · payé " + esc(fmtMoney(m.depenses_payees)) +
           " · " + m.nb_depenses + " dépense(s)</span>" +
         '<span class="entry-actions mini"><button class="btn btn-mini" data-member-card="' +
-          esc(m.name) + '">' + icon("image") + " Voir la carte</button></span>" +
+          esc(m.name) + '">' + icon("image") + " Voir le résumé</button></span>" +
       "</div>" +
       '<span class="row-value strong">' + esc(fmtMoney((m.apports || 0) + (m.depenses_payees || 0))) + "</span>" +
     "</div>"
@@ -872,7 +872,7 @@ function renderCharts() {
   });
 }
 
-/* ---------------------------------------------------------------- cartes */
+/* --------------------------------------------------------------- résumés */
 /*
  * Cards displayed IN the panel (display rule, Landry 2026-11-06),
  * rendered natively from the snapshot — the same figures the bot
@@ -1097,11 +1097,11 @@ function openCard(kind, name) {
   }
   let title = "", body = "";
   cardSendSpec = { action: "send_chart",
-                   params: { chart: kind }, sent: "Carte envoyée — elle arrive dans le chat" };
+                   params: { chart: kind }, sent: "Résumé envoyé — il arrive dans le chat" };
   if (kind === "membre") {
     const m = panel.members.find((x) => x.name === name);
     if (!m) return;
-    title = "👤 Carte de " + m.name;
+    title = "👤 Résumé de " + m.name;
     body = memberCardHTML(m);
     cardSendSpec.params = { chart: "membre", name: m.name };
   } else if (kind === "projet") {
@@ -1114,10 +1114,10 @@ function openCard(kind, name) {
     title = "📈 Tableau de bord";
     body = dashboardCardHTML();
   } else if (kind === "pilotage") {
-    title = "🧭 Pilotage";
+    title = "🧭 Ce qui reste à faire";
     body = pilotageCardHTML();
   } else if (kind === "startup") {
-    title = "🔥 Vue startup";
+    title = "🔥 Vue d'ensemble";
     body = startupCardHTML();
   } else {
     return;

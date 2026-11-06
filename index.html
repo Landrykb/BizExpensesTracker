@@ -178,7 +178,7 @@
     </section>
   </div>
 
-  <!-- ============ Écritures (Récentes / Recherche / Sans justificatif / + Dépense / + Apport) ============ -->
+  <!-- ============ Mouvements (Récentes / Recherche / Sans justificatif / + Dépense / + Apport) ============ -->
   <div class="view" id="view-entries">
     <section>
       <div class="create-row">
@@ -290,8 +290,8 @@
       <div class="card">
         <div id="member-list"></div>
       </div>
-      <p class="hint-note">« Voir la carte » affiche la carte d'un membre ici même.
-      Sur la carte, « Envoyer dans le chat » la poste aussi en image dans ta conversation.</p>
+      <p class="hint-note">« Voir le résumé » affiche le résumé d'un membre ici même.
+      Sur le résumé, « Envoyer dans le chat » le poste aussi en image dans ta conversation.</p>
     </section>
     <section id="participations-wrap" hidden>
       <div class="list-head">
@@ -325,29 +325,29 @@
     </section>
     <section>
       <div class="list-head">
-        <h2><svg class="ic"><use href="#i-image"/></svg> Cartes du registre</h2>
+        <h2><svg class="ic"><use href="#i-image"/></svg> Résumés du registre</h2>
       </div>
       <div class="card">
-        <p class="hint-note">Touche une carte pour l'afficher ici même. Sur la carte,
-        « Envoyer dans le chat » la poste aussi en image dans ta conversation —
+        <p class="hint-note">Touche un résumé pour l'afficher ici même. Sur le résumé,
+        « Envoyer dans le chat » le poste aussi en image dans ta conversation —
         les mêmes images que le /voir du bot.</p>
         <div class="send-list">
           <button class="btn btn-send" data-chart="dashboard">📈 Tableau de bord</button>
-          <button class="btn btn-send" data-chart="pilotage">🧭 Pilotage</button>
-          <button class="btn btn-send" data-chart="startup">🔥 Vue startup</button>
+          <button class="btn btn-send" data-chart="pilotage">🧭 Ce qui reste à faire</button>
+          <button class="btn btn-send" data-chart="startup">🔥 Vue d'ensemble</button>
         </div>
-        <h3 class="card-title">Cartes par projet</h3>
+        <h3 class="card-title">Résumés par projet</h3>
         <div class="send-list" id="project-cards"></div>
       </div>
     </section>
   </div>
 
-  <!-- ============ Carte affichée dans le panneau ============
+  <!-- ============ Résumé affiché dans le panneau ============
        Member / project / dashboard / pilotage / startup cards open
        HERE (Landry, 2026-11-06: requested from the panel ->
        displayed in the panel), rendered natively from the snapshot.
        The foot button is the explicit chat delivery: the bot posts
-       the same card as an image in the DM (send_chart). -->
+       the same résumé as an image in the DM (send_chart). -->
   <div class="view" id="view-card">
     <section>
       <div class="list-head">
@@ -365,7 +365,7 @@
 
 <nav id="tabbar" hidden>
   <button class="tab active" data-view="overview"><svg class="ic"><use href="#i-home"/></svg><span>Accueil</span></button>
-  <button class="tab" data-view="entries"><svg class="ic"><use href="#i-list"/></svg><span>Écritures</span></button>
+  <button class="tab" data-view="entries"><svg class="ic"><use href="#i-list"/></svg><span>Mouvements</span></button>
   <button class="tab" data-view="pending"><svg class="ic"><use href="#i-clock"/></svg><span>Attente</span><span class="tab-badge" id="tab-pending-badge" hidden></span></button>
   <button class="tab" data-view="members"><svg class="ic"><use href="#i-users"/></svg><span>Membres</span></button>
   <button class="tab" data-view="charts"><svg class="ic"><use href="#i-chart"/></svg><span>Graphes</span></button>
