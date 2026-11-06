@@ -168,12 +168,49 @@
       </div>
       <div id="project-list" class="card-list"></div>
       <div class="card totals-card">
+        <!-- Complete frame (Landry, 2026-11-06): EVERY component
+             line always prints, 0 included — apports +
+             financement + ventes − dépenses = solde global,
+             checkable on screen. -->
         <div class="row"><span class="row-label">Total apports</span>
           <span class="row-value strong" id="tot-app"></span></div>
+        <div class="row" id="tot-fin-row"><span class="row-label">Total financement</span>
+          <span class="row-value strong" id="tot-fin"></span></div>
+        <div class="row" id="tot-ventes-row"><span class="row-label">Total ventes</span>
+          <span class="row-value strong" id="tot-ventes"></span></div>
         <div class="row"><span class="row-label">Total dépensé (tous projets)</span>
           <span class="row-value strong" id="tot-dep"></span></div>
         <div class="row"><span class="row-label">Solde global</span>
           <span class="row-value strong" id="tot-solde"></span></div>
+      </div>
+    </section>
+
+    <!-- Importer (Stage 3): PERMANENTLY visible — the entry point
+         of the guided ingestion (bot-side /importer flow). The
+         member pastes the foreign book's link here; « Lancer
+         l'import » hands it to the bot (sendData start_import),
+         which reads the book and runs the mapping confirmations
+         as a button conversation in the DM. Nothing is written
+         before the final « Lancer l'import » validation there. -->
+    <section id="import-wrap">
+      <div class="list-head">
+        <h2><svg class="ic"><use href="#i-send"/></svg> Importer un classeur hérité</h2>
+      </div>
+      <div class="entry-form">
+        <p class="hint-note">Compile un ancien classeur Google Sheets dans ce registre :
+        colle son lien ci-dessous. Le classeur doit être partagé avec le compte de
+        service du registre (lecture suffit) — si le bot ne peut pas le lire, il te
+        donnera l'adresse exacte dans la conversation.</p>
+        <label>Lien du classeur Google Sheets
+          <input id="import-link" type="url" inputmode="url"
+            placeholder="https://docs.google.com/spreadsheets/d/…">
+        </label>
+        <div class="form-actions">
+          <button class="btn btn-approve" id="btn-import">Lancer l'import</button>
+        </div>
+        <p class="hint-note">Le bot lit le classeur sans rien écrire, puis te guide
+        dans la conversation : correspondance des colonnes, import à blanc, et
+        l'écriture seulement après ta validation finale.</p>
       </div>
     </section>
   </div>

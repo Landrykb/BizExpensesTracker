@@ -31,6 +31,11 @@
  *   send_chart                     -> chart, name?
  *   send_receipt                   -> entry_id
  *   switch_team                    -> group_id (Accueil team list)
+ *   start_import                   -> link (Accueil « Importer » :
+ *                                     the guided ingestion's panel
+ *                                     entry — the bot reads the
+ *                                     book and runs the mapping
+ *                                     confirmations in the DM)
  *
  * Amounts arrive as raw integers; the app formats them with
  * fmtMoney, the twin of core.fmt_fcfa ("1 250 000 FCFA").
@@ -78,8 +83,14 @@ const els = {
   growthHolders: $("growth-holders"),
   projectList: $("project-list"),
   totApp: $("tot-app"),
+  totFinRow: $("tot-fin-row"),
+  totFin: $("tot-fin"),
   totDep: $("tot-dep"),
   totSolde: $("tot-solde"),
+  totVentesRow: $("tot-ventes-row"),
+  totVentes: $("tot-ventes"),
+  importLink: $("import-link"),
+  btnImport: $("btn-import"),
   monthYm: $("month-ym"),
   monthDep: $("month-dep"),
   monthDepN: $("month-dep-n"),
@@ -120,7 +131,7 @@ const MOCK_PANEL = {
            color: "#2e7d32", dark: "#1b5e20" },
   src: { f: 105000, v: 3000 },
   projects: [
-    { name: "Food Haxun", apports: 1250000, depenses: 1015000, solde: 235000 },
+    { name: "Food Haxun", apports: 1250000, depenses: 1015000, solde: 343000, f: 105000, v: 3000 },
     { name: "Nonvi Honton", apports: 300000, depenses: 342500, solde: -42500 },
     { name: "Commun", apports: 150000, depenses: 48000, solde: 102000 },
   ],
@@ -130,6 +141,7 @@ const MOCK_PANEL = {
     { name: "Dimas", apports: 450000, depenses_payees: 980500, nb_depenses: 47 },
     { name: "Mikhaël-Christ", apports: 500000, depenses_payees: 65000, nb_depenses: 9 },
     { name: "Jacques", apports: 250000, depenses_payees: 148000, nb_depenses: 12 },
+    { name: "Historique (importé)", h: 1, apports: 0, depenses_payees: 324740, nb_depenses: 37 },
   ],
   pending: [
     { k: "d", i: "DEP-0142", d: "2026-11-05", l: "Dimas", p: "Caisse",
@@ -186,7 +198,7 @@ const MOCK_PANEL = {
   participations: [
     { j: "Food Haxun — Tokyo8 (sous-projet clos)", r: 1, p: [1, 0, 1, 1],
       a: [100000, 0, 15000, 110000], c: [75000, 0, 75000, 75000],
-      e: [0, 0, 0, 0], d: 222240, s: 2760 },
+      e: [0, 0, 0, 0], d: 222240, s: 5760, x: 3000 },
     { j: "Food Haxun — Déploiement de l'app",
       a: [6480, 0, 63550, 53250], e: [-24340, -30820, 32730, 22430],
       d: 31780, s: 91500 },
@@ -195,7 +207,8 @@ const MOCK_PANEL = {
       e: [0, 0, 0, 0], d: 102500, s: 2500 },
     { j: null,
       a: [132730, 26250, 104800, 189500], e: [-24340, -30820, 32730, 22430],
-      d: 356520, s: 96760, w: [26250, 26250, 26250, 26250] },
+      d: 356520, s: 99760, f: 105000, x: 3000,
+      w: [26250, 26250, 26250, 26250] },
   ],
   form_options: {
     projects: ["Food Haxun", "Nonvi Honton", "Commun"],
@@ -444,15 +457,15 @@ function renderGrowth() {
 }
 
 function renderProjects() {
-  /* CAISSE frame, like the pilotage / startup cards: a project's
-   * money-in is its member apports PLUS its REV money (financement,
-   * ventes — src.p). Reading panel.projects raw here printed the
-   * member frame instead: the 2023 project showed « Apports 0 »
-   * and −102 500 while the chat card showed +2 500 (Landry,
-   * 2026-11-07). The REV part rides as a « dont … » sub-row so the
-   * combined figure never masquerades as member apports. */
-  const eff = effectiveProjects();
-  els.projectList.innerHTML = eff.map((p) => {
+  /* Money model (2026-11-06): ONE frame everywhere — the
+   * COMPLETE frame (Landry's decision): a project's solde is
+   * apports + financement + ventes − dépenses (core.summarize),
+   * the same figure the Participations header prints. Every
+   * component prints on its own line: a project card shows its
+   * Financement / Ventes lines when the project has that money;
+   * the GLOBAL totals card ALWAYS shows all four lines (0
+   * included) so the arithmetic is checkable on screen. */
+  els.projectList.innerHTML = panel.projects.map((p) => {
     const neg = p.solde < 0;
     const entrees = (p.apports || 0) + (p.rev || 0);
     return (
@@ -462,21 +475,24 @@ function renderProjects() {
           '<span class="pill ' + (neg ? "st-neg" : "st-pos") + '">' + esc(fmtMoney(p.solde)) + "</span>" +
         "</div>" +
         '<div class="row"><span class="row-label">Apports</span>' +
-          '<span class="row-value">' + esc(fmtMoney(entrees)) + "</span></div>" +
-        (p.rev
-          ? '<div class="row"><span class="row-label">dont financement / ventes</span>' +
-            '<span class="row-value">' + esc(fmtMoney(p.rev)) + "</span></div>"
-          : "") +
+          '<span class="row-value">' + esc(fmtMoney(p.apports)) + "</span></div>" +
+        (p.f ? '<div class="row"><span class="row-label">Financement</span>' +
+          '<span class="row-value">' + esc(fmtMoney(p.f)) + "</span></div>" : "") +
+        (p.v ? '<div class="row"><span class="row-label">Ventes</span>' +
+          '<span class="row-value">' + esc(fmtMoney(p.v)) + "</span></div>" : "") +
         '<div class="row"><span class="row-label">Dépenses</span>' +
           '<span class="row-value">' + esc(fmtMoney(p.depenses)) + "</span></div>" +
       "</article>"
     );
   }).join("");
-  const tot = eff.reduce((a, p) => ({
-    app: a.app + (p.apports || 0) + (p.rev || 0), dep: a.dep + (p.depenses || 0),
+  const tot = panel.projects.reduce((a, p) => ({
+    app: a.app + (p.apports || 0), fin: a.fin + (p.f || 0),
+    ventes: a.ventes + (p.v || 0), dep: a.dep + (p.depenses || 0),
     solde: a.solde + (p.solde || 0),
-  }), { app: 0, dep: 0, solde: 0 });
+  }), { app: 0, fin: 0, ventes: 0, dep: 0, solde: 0 });
   els.totApp.textContent = fmtMoney(tot.app);
+  els.totFin.textContent = fmtMoney(tot.fin);
+  els.totVentes.textContent = fmtMoney(tot.ventes);
   els.totDep.textContent = fmtMoney(tot.dep);
   els.totSolde.textContent = fmtMoney(tot.solde);
 }
@@ -676,6 +692,33 @@ els.formApport.addEventListener("submit", (ev) => {
   });
 });
 
+/* ------------------------------------------------------------ importer */
+
+/* The guided ingestion's panel entry (Stage 3): PERMANENTLY
+ * visible in the Accueil — not wake-on-data, not first-run-only.
+ * The member pastes the foreign book's link here; the tap sends
+ * it to the bot (start_import), which reads the book read-only
+ * and runs the mapping confirmations as a button conversation
+ * in the DM (the panel cannot host a multi-turn dialogue —
+ * sendData is one-way and closes the app). Nothing is written
+ * before the flow's final « Lancer l'import » validation. */
+els.btnImport.addEventListener("click", () => {
+  const link = (els.importLink.value || "").trim();
+  if (!link) {
+    toast("Colle d'abord le lien du classeur Google Sheets.");
+    return;
+  }
+  confirmDo("Lancer l'import de ce classeur ? Le bot le lira " +
+            "sans rien écrire, puis te guidera dans la " +
+            "conversation pour confirmer la correspondance — " +
+            "rien n'est importé avant ta validation finale.",
+    () => {
+      haptic("notify", "success");
+      sendAction("start_import", { link: link });
+      toast("Import envoyé au bot — la suite se passe dans la conversation");
+    });
+});
+
 /* --------------------------------------------------------------- en attente */
 
 function renderPending() {
@@ -763,8 +806,11 @@ function renderMembers() {
           (m.prov ? " · dont " + esc(fmtMoney(m.prov)) + " provisoire (2023)" : "") +
           " · payé " + esc(fmtMoney(m.depenses_payees)) +
           " · " + m.nb_depenses + " dépense(s)</span>" +
-        '<span class="entry-actions mini"><button class="btn btn-mini" data-member-card="' +
-          esc(m.name) + '">' + icon("image") + " Voir le résumé</button></span>" +
+        /* The aggregate line (« Historique (importé) », "h": 1)
+         * is NOT a person: no résumé button, no card. */
+        (m.h ? "" :
+          '<span class="entry-actions mini"><button class="btn btn-mini" data-member-card="' +
+            esc(m.name) + '">' + icon("image") + " Voir le résumé</button></span>") +
       "</div>" +
       '<span class="row-value strong">' + esc(fmtMoney((m.apports || 0) + (m.depenses_payees || 0))) + "</span>" +
     "</div>"
@@ -802,27 +848,60 @@ function renderMembers() {
         (b.v ? " · provisoire" : "")
       : "Participations — Projets suivis";
     const totalA = (b.a || []).reduce((s, v) => s + (v || 0), 0);
-    const facts = b.v
-      ? '<div class="entry-meta part-facts">Dépenses ' +
-        esc(fmtMoney(b.d || 0)) + " · Financement " +
-        esc(fmtMoney(b.f || 0)) + " · Solde " +
-        esc(fmtMoney(b.s || 0)) + "</div>"
-      : '<div class="entry-meta part-facts">Dépenses ' +
-        esc(fmtMoney(b.d || 0)) + " · Apporté " + esc(fmtMoney(totalA)) +
-        " · Solde " + esc(fmtMoney(b.s || 0)) + "</div>";
+    /* Facts lines show EVERY money component (complete frame,
+     * Landry 2026-11-06): a project block adds its Financement
+     * ("f") / Ventes ("x") segments when the project has that
+     * money; the total block (j === null) ALWAYS prints the full
+     * decomposition — Apports (recorded member apports = Σa − Σw,
+     * the provisional credit being financement money) ·
+     * Financement · Ventes · Dépenses · Solde — so its
+     * arithmetic is checkable on screen. */
+    let factsBody;
+    if (!b.j) {
+      const provTotal = (b.w || []).reduce((s, v) => s + (v || 0), 0);
+      factsBody = "Dépenses " + esc(fmtMoney(b.d || 0)) +
+        " · Apports " + esc(fmtMoney(totalA - provTotal)) +
+        " · Financement " + esc(fmtMoney(b.f || 0)) +
+        " · Ventes " + esc(fmtMoney(b.x || 0)) +
+        " · Solde " + esc(fmtMoney(b.s || 0));
+    } else if (b.v) {
+      factsBody = "Dépenses " + esc(fmtMoney(b.d || 0)) +
+        " · Financement " + esc(fmtMoney(b.f || 0)) +
+        (b.x ? " · Ventes " + esc(fmtMoney(b.x)) : "") +
+        " · Solde " + esc(fmtMoney(b.s || 0));
+    } else {
+      factsBody = "Dépenses " + esc(fmtMoney(b.d || 0)) +
+        " · Apporté " + esc(fmtMoney(totalA)) +
+        (b.f ? " · Financement " + esc(fmtMoney(b.f)) : "") +
+        (b.x ? " · Ventes " + esc(fmtMoney(b.x)) : "") +
+        " · Solde " + esc(fmtMoney(b.s || 0));
+    }
+    const facts = '<div class="entry-meta part-facts">' +
+      factsBody + "</div>";
     const rows = (b.a || []).map((apporte, i) => {
       if (b.p && !b.p[i]) return "";
       const ecart = (b.e || [])[i] || 0;
       const name = (panel.members[i] || {}).name || "";
+      /* One « a apporté » definition per scope, LABELLED
+       * (money-model fix, 2026-11-06): a project block's line is
+       * that project's apports — « dans ce projet » says so, so
+       * it can no longer be read against the member's global
+       * total (the 63 550 vs 93 550 confusion); the total block
+       * (j === null) carries the global figure, the same one the
+       * Par membre list prints. */
       let meta;
       if (b.v) {
         meta = "part provisoire créditée " +
           esc(fmtMoney((b.c || [])[i] || 0)) +
-          (apporte ? " · a apporté " + esc(fmtMoney(apporte)) : "");
+          (apporte ? " · a apporté " + esc(fmtMoney(apporte)) +
+            " dans ce projet" : "");
+      } else if (b.j) {
+        meta = "a apporté " + esc(fmtMoney(apporte)) +
+          " dans ce projet" +
+          (b.r ? " · part égale " + esc(fmtMoney((b.c || [])[i] || 0)) : "");
       } else {
         meta = "a apporté " + esc(fmtMoney(apporte)) +
-          (b.r ? " · part égale " + esc(fmtMoney((b.c || [])[i] || 0)) : "") +
-          (!b.j && b.w && b.w[i] ? " · dont " +
+          (b.w && b.w[i] ? " · dont " +
             esc(fmtMoney(b.w[i])) + " provisoire (2023)" : "");
       }
       return '<div class="row entry-row">' +
@@ -894,14 +973,18 @@ function renderCharts() {
  * blocks; the dashboard / pilotage / startup cards decompose
  * money-in via the snapshot's `src` block (counted REV rows of
  * this scope: f = financement, v = ventes, p = REV total per
- * project) — member apports are the projects' apports sum
- * (core.summarize counts « Apport membre » rows only), so total
- * money-in = apports + f + v, exactly core.startup_focus's split.
- * « Restant par projet » (pilotage) and « Restant (pots) »
- * (startup) are CAISSE-frame figures: per-project money-in
- * includes that project's REV money (src.p) — without it the 2023
- * project would print −102 500 in the panel while the chat card
- * shows +2 500, the frame collision this fix exists to kill.
+ * project) — member apports are the projects' apports sum.
+ * ONE frame (complete frame, Landry's decision 2026-11-06): the
+ * SOLDE — dashboard « Solde global », Budget cards,
+ * Participations header, pilotage « Restant par projet »,
+ * startup « Restant (pots) » — is apports + financement +
+ * ventes − dépenses, exactly core.summarize's ecart. PR #15
+ * first split a "tracked" solde (ventes excluded) from the
+ * caisse-frame restants; Landry chose the complete frame, so
+ * the two coincide: effectiveProjects' per-project balance
+ * (apports + the project's REV money − dépenses, the
+ * core.pm_focus arithmetic) IS the project's solde, and every
+ * card shows each component on its own line.
  * Each card's foot button (« Envoyer dans le chat ») is the
  * explicit chat delivery of the same card as an image.
  */
@@ -922,8 +1005,11 @@ function projectsTotals() {
   }), { app: 0, dep: 0 });
 }
 
-/* Projects with their CAISSE-frame balance: money-in = member
- * apports + the project's REV money. src.p carries it as
+/* Projects with their balance: money-in = member apports +
+ * the project's REV money — under the complete frame this IS
+ * the project's solde (core.summarize's ecart), so the
+ * pilotage / startup restants below agree with the Budget
+ * cards to the franc. src.p carries it as
  * [index into panel.projects, amount] pairs (project names are
  * too bulky to repeat as keys — snapshot budget); a project that
  * only ever received REV money is absent from panel.projects and
@@ -986,15 +1072,22 @@ function memberCardHTML(m) {
     if (b.p && !b.p[i]) return "";
     const apporte = (b.a || [])[i] || 0;
     const ecart = (b.e || [])[i] || 0;
+    /* Same labelling as the Membres view: project blocks are
+     * project-scoped (« dans ce projet »), the total block is
+     * the global figure. */
     let meta;
     if (b.v) {
       meta = "part provisoire créditée " +
         esc(fmtMoney((b.c || [])[i] || 0)) +
-        (apporte ? " · a apporté " + esc(fmtMoney(apporte)) : "");
+        (apporte ? " · a apporté " + esc(fmtMoney(apporte)) +
+          " dans ce projet" : "");
+    } else if (b.j) {
+      meta = "a apporté " + esc(fmtMoney(apporte)) +
+        " dans ce projet" +
+        (b.r ? " · part égale " + esc(fmtMoney((b.c || [])[i] || 0)) : "");
     } else {
       meta = "a apporté " + esc(fmtMoney(apporte)) +
-        (b.r ? " · part égale " + esc(fmtMoney((b.c || [])[i] || 0)) : "") +
-        (!b.j && b.w && b.w[i]
+        (b.w && b.w[i]
           ? " · dont " + esc(fmtMoney(b.w[i])) + " provisoire (2023)" : "");
     }
     const title = b.j
@@ -1013,18 +1106,30 @@ function memberCardHTML(m) {
 }
 
 function projectCardHTML(p) {
-  return moneyRow("Apports", p.apports || 0) +
-    moneyRow("Dépenses", p.depenses || 0) +
-    pillRow("Solde", p.solde || 0);
+  /* Every component on its own line (complete frame): the
+   * project's Financement / Ventes lines print when the project
+   * has that money — the same conditionality as its Budget
+   * card. */
+  let html = moneyRow("Apports", p.apports || 0);
+  if (p.f) html += moneyRow("Financement", p.f);
+  if (p.v) html += moneyRow("Ventes", p.v);
+  html += moneyRow("Dépenses", p.depenses || 0);
+  html += pillRow("Solde", p.solde || 0);
+  return html;
 }
 
 function dashboardCardHTML() {
   const t = projectsTotals();
   const fin = srcFin(), ventes = srcVentes();
+  /* Solde global = the COMPLETE frame (apports + financement +
+   * ventes − dépenses) — the same figure as the Accueil totals
+   * and the Participations header. This is a global card:
+   * every component line ALWAYS prints (0 included), so the
+   * arithmetic is checkable on screen. */
   let html = moneyRow("Total entré", t.app + fin + ventes);
   html += moneyRow("Apports des membres", t.app);
-  if (fin) html += moneyRow("Financement", fin);
-  if (ventes) html += moneyRow("Ventes", ventes);
+  html += moneyRow("Financement", fin);
+  html += moneyRow("Ventes", ventes);
   html += moneyRow("Total dépensé", t.dep);
   html += moneyRow("Solde global", t.app + fin + ventes - t.dep);
   html += cardRow("En attente",
@@ -1076,7 +1181,7 @@ function startupCardHTML() {
   const eff = effectiveProjects();
   const pots = eff.reduce((s, p) => s + Math.max(0, p.solde), 0);
   let html = moneyRow("Contribué", t.app);
-  html += moneyRow("Autres entrées", fin + ventes);
+  html += moneyRow("Autres entrées", fin);
   html += moneyRow("Dépensé", t.dep);
   html += moneyRow("Restant (pots)", pots);
   /* Qui finance: recorded member apports (the provisional credit
