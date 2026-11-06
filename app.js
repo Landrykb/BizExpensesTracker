@@ -444,8 +444,17 @@ function renderGrowth() {
 }
 
 function renderProjects() {
-  els.projectList.innerHTML = panel.projects.map((p) => {
+  /* CAISSE frame, like the pilotage / startup cards: a project's
+   * money-in is its member apports PLUS its REV money (financement,
+   * ventes — src.p). Reading panel.projects raw here printed the
+   * member frame instead: the 2023 project showed « Apports 0 »
+   * and −102 500 while the chat card showed +2 500 (Landry,
+   * 2026-11-07). The REV part rides as a « dont … » sub-row so the
+   * combined figure never masquerades as member apports. */
+  const eff = effectiveProjects();
+  els.projectList.innerHTML = eff.map((p) => {
     const neg = p.solde < 0;
+    const entrees = (p.apports || 0) + (p.rev || 0);
     return (
       '<article class="proj-card">' +
         '<div class="pc-top">' +
@@ -453,14 +462,18 @@ function renderProjects() {
           '<span class="pill ' + (neg ? "st-neg" : "st-pos") + '">' + esc(fmtMoney(p.solde)) + "</span>" +
         "</div>" +
         '<div class="row"><span class="row-label">Apports</span>' +
-          '<span class="row-value">' + esc(fmtMoney(p.apports)) + "</span></div>" +
+          '<span class="row-value">' + esc(fmtMoney(entrees)) + "</span></div>" +
+        (p.rev
+          ? '<div class="row"><span class="row-label">dont financement / ventes</span>' +
+            '<span class="row-value">' + esc(fmtMoney(p.rev)) + "</span></div>"
+          : "") +
         '<div class="row"><span class="row-label">Dépenses</span>' +
           '<span class="row-value">' + esc(fmtMoney(p.depenses)) + "</span></div>" +
       "</article>"
     );
   }).join("");
-  const tot = panel.projects.reduce((a, p) => ({
-    app: a.app + (p.apports || 0), dep: a.dep + (p.depenses || 0),
+  const tot = eff.reduce((a, p) => ({
+    app: a.app + (p.apports || 0) + (p.rev || 0), dep: a.dep + (p.depenses || 0),
     solde: a.solde + (p.solde || 0),
   }), { app: 0, dep: 0, solde: 0 });
   els.totApp.textContent = fmtMoney(tot.app);
