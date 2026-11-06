@@ -31,6 +31,8 @@
  *   send_chart                     -> chart, name?
  *   send_receipt                   -> entry_id
  *   switch_team                    -> group_id (Accueil team list)
+ *   set_language                   -> lang (header FR|EN switch:
+ *                                     the opener's personal pref)
  *   start_import                   -> link (Accueil « Importer » :
  *                                     the guided ingestion's panel
  *                                     entry — the bot reads the
@@ -249,6 +251,410 @@ if (DEMO) {
   panel = loadStateFromUrl();
 }
 
+/* ------------------------------------------------------------ language */
+/*
+ * Display language (Landry, 2026-11-06): the panel ships BOTH
+ * language tables client-side; the snapshot carries only `lang`
+ * (present solely when the OPENER's stored personal preference is
+ * English — the bot omits it for French, keeping French snapshots
+ * byte-identical and the size cap safe). Every label below renders
+ * from these tables via tt(); the completeness test
+ * (tests/test_language.py) pins that every referenced key exists
+ * in BOTH tables. The header's FR|EN switch re-renders instantly
+ * from the tables and sendActions `set_language` so the bot stores
+ * the opener's new personal preference server-side.
+ */
+const I18N = {
+  fr: {
+    "doc.title": "BizExpensesTracker — Panneau du registre",
+    "demo.badge": "Données de démo",
+    "scope.default": "Registre des dépenses",
+    "scope.prefix": "Registre — ",
+    "chat_gate": "Ouvre le panneau depuis le chat du bot pour recevoir l'image dans le chat",
+    "demo.toast": "Démo : {action} (non envoyé)",
+    "lang.switched": "Langue passée à {name} — préférence enregistrée",
+    "teams.title": "Mes équipes",
+    "teams.hint": "Le panneau affiche une équipe à la fois. Toucher une autre équipe demande au bot un panneau chargé pour elle — il arrive dans le chat, et ton choix est gardé pour la suite.",
+    "teams.fallback": "Équipe {id}",
+    "teams.current_meta": "Équipe affichée",
+    "teams.current_pill": "Actuelle",
+    "teams.open": "Ouvrir",
+    "teams.requested": "Équipe demandée — le panneau arrive dans le chat",
+    "growth.title": "Financement",
+    "growth.total_raised": "Total levé",
+    "growth.external": "dont externe",
+    "growth.holders": "Détenteurs au capital",
+    "month.title_prefix": "Ce mois — ",
+    "month.depenses_count": "{n} dépense(s)",
+    "month.apports_count": "{n} apport(s)",
+    "month.hint": "Seules les écritures approuvées comptent — l'argent en attente ne bouge aucun chiffre.",
+    "budget.title": "Budget — soldes par projet",
+    "budget.total_apports": "Total apports",
+    "budget.total_financement": "Total financement",
+    "budget.total_ventes": "Total ventes",
+    "budget.total_dep": "Total dépensé (tous projets)",
+    "budget.solde": "Solde global",
+    "common.apports": "Apports",
+    "common.depenses": "Dépenses",
+    "common.financement": "Financement",
+    "common.ventes": "Ventes",
+    "common.solde": "Solde",
+    "common.pending": "En attente",
+    "common.no_receipt": "Sans justificatif",
+    "common.count_money": "{n} · {amount}",
+    "common.send_to_chat": "Envoyer dans le chat",
+    "entries.new_depense": "Dépense",
+    "entries.new_apport": "Apport",
+    "entries.recent_apports": "Derniers apports",
+    "entries.missing_title": "Sans justificatif",
+    "entries.empty": "Aucune écriture ne correspond.",
+    "entries.none_missing": "Aucune dépense sans justificatif. ✅",
+    "entries.search_scope": "Recherche dans les {n} dernières dépenses chargées",
+    "entries.search_missing": " · {n} sans justificatif au total.",
+    "entries.search_end": ".",
+    "receipt.sent_toast": "Justificatif demandé — il arrive dans le chat",
+    "form.dep_title": "Nouvelle dépense",
+    "form.app_title": "Nouvel apport",
+    "form.amount": "Montant (FCFA)",
+    "form.amount_ph": "ex. 15 000",
+    "form.desc": "Libellé",
+    "form.desc_ph": "Décris la dépense en une ligne",
+    "form.project": "Projet",
+    "form.category": "Catégorie",
+    "form.payer": "Qui a payé ?",
+    "form.funder": "Financé par qui ?",
+    "form.method": "Méthode de paiement",
+    "form.method_short": "Méthode",
+    "form.dep_hint": "À l'envoi, la dépense part <strong>en attente</strong> : un second membre devra l'approuver. Le bot te demandera ensuite la photo du justificatif dans le chat — une seule photo, rien d'autre à faire.",
+    "form.app_hint": "L'apport est saisi à ton nom et part <strong>en attente</strong> : un second membre devra l'approuver pour qu'il compte dans les participations.",
+    "form.cancel": "Annuler",
+    "form.save": "Enregistrer",
+    "form.dep_required": "Montant et libellé sont obligatoires.",
+    "form.amount_required": "Le montant est obligatoire.",
+    "form.dep_confirm": "Enregistrer cette dépense de {amount} ? Elle partira en attente d'approbation.",
+    "form.app_confirm": "Enregistrer cet apport de {amount} ? Il partira en attente d'approbation.",
+    "form.dep_sent": "Dépense envoyée au bot",
+    "form.app_sent": "Apport envoyé au bot",
+    "search.ph": "Chercher une dépense (mot-clé, projet, payeur…)",
+    "chips.all": "Toutes",
+    "chips.depenses": "Dépenses",
+    "chips.apports": "Apports",
+    "chips.missing": "🧾 Sans justificatif",
+    "pending.title": "En attente d'approbation",
+    "pending.hint": "Règle des deux personnes : chaque écriture est validée par un second membre — jamais par celui qui a payé ni par celui qui l'a saisie. La première décision est finale.",
+    "pending.empty": "<strong>Rien en attente.</strong> Toutes les écritures sont décidées. ✅",
+    "pending.approve": "Approuver",
+    "pending.reject": "Refuser",
+    "pending.self_note": "Tu as payé ou saisi cette écriture — un autre membre doit décider.",
+    "pending.app_who": "Apport de : {m} · Saisi par : {l}",
+    "pending.dep_who": "Payeur : {p} · Saisi par : {l}",
+    "pending.kind_apport": "💰 Apport",
+    "pending.kind_depense": "💸 Dépense",
+    "pending.oldest_note": "Les {shown} plus anciennes sont affichées, sur {total} en attente au total — les suivantes apparaissent à mesure que celles-ci sont décidées.",
+    "pending.decide_confirm": "{verb} l'écriture {id} ({amount}) — {desc} ?",
+    "pending.approved_toast": "Approuvée — envoyé au bot",
+    "pending.rejected_toast": "Refusée — envoyé au bot",
+    "members.title": "Par membre — total apporté",
+    "members.hint": "« Voir le résumé » affiche le résumé d'un membre ici même. Sur le résumé, « Envoyer dans le chat » le poste aussi en image dans ta conversation.",
+    "members.apports": "Apports {amount}",
+    "members.prov_part": " · dont {amount} provisoire (2023)",
+    "members.paid_part": " · payé {amount}",
+    "members.dep_count": " · {n} dépense(s)",
+    "members.view_summary": "Voir le résumé",
+    "part.section_title": "Participations — par projet",
+    "part.title_prefix": "Participations — ",
+    "part.title_total": "Participations — Projets suivis",
+    "part.followed": "Projets suivis",
+    "part.settled_suffix": " · réglé",
+    "part.provisional_suffix": " · provisoire",
+    "part.facts": "Dépenses {dep} · Apporté {app} · Solde {solde}",
+    "part.facts_fin": "Dépenses {dep} · Financement {fin} · Solde {solde}",
+    "part.facts_total": "Dépenses {dep} · Apports {app} · Financement {fin} · Ventes {ventes} · Solde {solde}",
+    "part.facts_dep_fin": "Dépenses {dep} · Financement {fin}",
+    "part.facts_dep_app": "Dépenses {dep} · Apporté {app}",
+    "part.seg_financement": " · Financement {fin}",
+    "part.seg_ventes": " · Ventes {ventes}",
+    "part.seg_solde": " · Solde {solde}",
+    "part.contributed_in_project": "a apporté {amount} dans ce projet",
+    "part.contributed_part_in_project": " · a apporté {amount} dans ce projet",
+    "part.contributed": "a apporté {amount}",
+    "part.contributed_part": " · a apporté {amount}",
+    "part.equal_share_part": " · part égale {amount}",
+    "part.prov_credited": "part provisoire créditée {amount}",
+    "part.prov_note": "Attribution provisoire, en parts égales — elle sera confirmée à partir des relevés de transactions.",
+    "part.ecart_title": "Écart — repère",
+    "charts.by_category": "Dépenses par catégorie",
+    "charts.by_project": "Dépenses par projet",
+    "charts.trend": "Tendance — dépenses par mois",
+    "charts.summaries": "Résumés du registre",
+    "charts.summaries_hint": "Touche un résumé pour l'afficher ici même. Sur le résumé, « Envoyer dans le chat » le poste aussi en image dans ta conversation — les mêmes images que le /voir du bot.",
+    "charts.by_project_cards": "Résumés par projet",
+    "charts.empty": "Aucune donnée pour le moment.",
+    "member.apporte": "Apporté",
+    "member.prov_note": "dont {amount} provisoire (2023) — attribution à confirmer.",
+    "member.depenses_payees": "Dépenses payées",
+    "member.depenses_financees": "Dépenses financées",
+    "member.dep_count": "{n} dépense(s)",
+    "member.participations_title": "Participations par projet",
+    "dash.total_in": "Total entré",
+    "dash.member_apports": "Apports des membres",
+    "dash.financement": "Financement",
+    "dash.ventes": "Ventes",
+    "dash.total_out": "Total dépensé",
+    "dash.solde_global": "Solde global",
+    "dash.balances_title": "Soldes par projet",
+    "dash.by_category": "Dépenses par catégorie",
+    "pilotage.last_month": "Dernier mois actif",
+    "pilotage.by_month": "Dépenses par mois (récent)",
+    "pilotage.remaining_title": "Restant par projet",
+    "pilotage.deficits": "Projets en négatif : {list}.",
+    "pilotage.no_deficits": "Aucun projet en négatif — tout est financé.",
+    "pilotage.pending_title": "En attente d'approbation",
+    "startup.contributed": "Contribué",
+    "startup.other_in": "Autres entrées",
+    "startup.spent": "Dépensé",
+    "startup.remaining": "Restant (pots)",
+    "startup.who_funds": "Qui finance",
+    "startup.by_project": "Dépenses par projet",
+    "startup.burn": "Burn — dépenses par mois",
+    "startup.footer": "Revenus (ventes) : {ventes} · financements externes : {fin} · engagé en attente {pending}.",
+    "card.sent_toast": "Résumé envoyé — il arrive dans le chat",
+    "card.member_title": "👤 Résumé de {name}",
+    "card.dashboard_title": "📈 Tableau de bord",
+    "card.pilotage_title": "🧭 Ce qui reste à faire",
+    "card.startup_title": "🔥 Vue d'ensemble",
+    "card.back": "← Retour",
+    "tab.overview": "Accueil",
+    "tab.entries": "Mouvements",
+    "tab.pending": "Attente",
+    "tab.members": "Membres",
+    "tab.charts": "Graphes",
+    "empty.title": "<strong>Panneau réservé aux membres du registre.</strong>",
+    "empty.body": "Ouvre ce panneau depuis <strong>/start</strong> ou <strong>/voir</strong> dans ta conversation privée avec <strong>@bizexpensestracker_bot</strong> — c'est le bot qui charge les chiffres, signés et à jour."
+  },
+  en: {
+    "doc.title": "BizExpensesTracker — Register panel",
+    "demo.badge": "Demo data",
+    "scope.default": "Expense register",
+    "scope.prefix": "Register — ",
+    "chat_gate": "Open the panel from the bot's chat to receive the image in the chat",
+    "demo.toast": "Demo: {action} (not sent)",
+    "lang.switched": "Language switched to {name} — preference saved",
+    "teams.title": "My teams",
+    "teams.hint": "The panel shows one team at a time. Tapping another team asks the bot for a panel loaded for it — it arrives in the chat, and your choice is kept for what follows.",
+    "teams.fallback": "Team {id}",
+    "teams.current_meta": "Team shown here",
+    "teams.current_pill": "Current",
+    "teams.open": "Open",
+    "teams.requested": "Team requested — the panel is on its way to the chat",
+    "growth.title": "Funding",
+    "growth.total_raised": "Total raised",
+    "growth.external": "of which external",
+    "growth.holders": "Shareholders",
+    "month.title_prefix": "This month — ",
+    "month.depenses_count": "{n} expense(s)",
+    "month.apports_count": "{n} contribution(s)",
+    "month.hint": "Only approved entries count — pending money moves no figure.",
+    "budget.title": "Budget — balances by project",
+    "budget.total_apports": "Total contributions",
+    "budget.total_financement": "Total financing",
+    "budget.total_ventes": "Total sales",
+    "budget.total_dep": "Total spent (all projects)",
+    "budget.solde": "Overall balance",
+    "common.apports": "Contributions",
+    "common.depenses": "Expenses",
+    "common.financement": "Funding",
+    "common.ventes": "Sales",
+    "common.solde": "Balance",
+    "common.pending": "Pending",
+    "common.no_receipt": "No receipt",
+    "common.count_money": "{n} · {amount}",
+    "common.send_to_chat": "Send to chat",
+    "entries.new_depense": "Expense",
+    "entries.new_apport": "Contribution",
+    "entries.recent_apports": "Latest contributions",
+    "entries.missing_title": "No receipt",
+    "entries.empty": "No entry matches.",
+    "entries.none_missing": "No expense without a receipt. ✅",
+    "entries.search_scope": "Searching the {n} latest loaded expenses",
+    "entries.search_missing": " · {n} without a receipt in total.",
+    "entries.search_end": ".",
+    "receipt.sent_toast": "Receipt requested — it is on its way to the chat",
+    "form.dep_title": "New expense",
+    "form.app_title": "New contribution",
+    "form.amount": "Amount (FCFA)",
+    "form.amount_ph": "e.g. 15 000",
+    "form.desc": "Description",
+    "form.desc_ph": "Describe the expense in one line",
+    "form.project": "Project",
+    "form.category": "Category",
+    "form.payer": "Who paid?",
+    "form.funder": "Funded by whom?",
+    "form.method": "Payment method",
+    "form.method_short": "Method",
+    "form.dep_hint": "On send, the expense goes <strong>to pending</strong>: a second member must approve it. The bot will then ask you for the receipt photo in the chat — one photo, nothing else to do.",
+    "form.app_hint": "The contribution is entered under your name and goes <strong>to pending</strong>: a second member must approve it for it to count in the participations.",
+    "form.cancel": "Cancel",
+    "form.save": "Save",
+    "form.dep_required": "Amount and description are required.",
+    "form.amount_required": "Amount is required.",
+    "form.dep_confirm": "Save this expense of {amount}? It will go to pending approval.",
+    "form.app_confirm": "Save this contribution of {amount}? It will go to pending approval.",
+    "form.dep_sent": "Expense sent to the bot",
+    "form.app_sent": "Contribution sent to the bot",
+    "search.ph": "Search an expense (keyword, project, payer…)",
+    "chips.all": "All",
+    "chips.depenses": "Expenses",
+    "chips.apports": "Contributions",
+    "chips.missing": "🧾 No receipt",
+    "pending.title": "Pending approval",
+    "pending.hint": "Two-person rule: every entry is validated by a second member — never by the one who paid or the one who entered it. The first decision is final.",
+    "pending.empty": "<strong>Nothing pending.</strong> Every entry is decided. ✅",
+    "pending.approve": "Approve",
+    "pending.reject": "Reject",
+    "pending.self_note": "You paid or entered this entry — another member must decide.",
+    "pending.app_who": "Contribution from: {m} · Entered by: {l}",
+    "pending.dep_who": "Payer: {p} · Entered by: {l}",
+    "pending.kind_apport": "💰 Contribution",
+    "pending.kind_depense": "💸 Expense",
+    "pending.oldest_note": "Showing the {shown} oldest, out of {total} pending in total — the next ones appear as these get decided.",
+    "pending.decide_confirm": "{verb} entry {id} ({amount}) — {desc}?",
+    "pending.approved_toast": "Approved — sent to the bot",
+    "pending.rejected_toast": "Rejected — sent to the bot",
+    "members.title": "By member — total contributed",
+    "members.hint": "“View summary” shows a member's summary right here. On the summary, “Send to chat” also posts it as an image in your conversation.",
+    "members.apports": "Contributed {amount}",
+    "members.prov_part": " · incl. {amount} provisional (2023)",
+    "members.paid_part": " · paid {amount}",
+    "members.dep_count": " · {n} expense(s)",
+    "members.view_summary": "View summary",
+    "part.section_title": "Participations — by project",
+    "part.title_prefix": "Participations — ",
+    "part.title_total": "Participations — Tracked projects",
+    "part.followed": "Tracked projects",
+    "part.settled_suffix": " · settled",
+    "part.provisional_suffix": " · provisional",
+    "part.facts": "Expenses {dep} · Contributed {app} · Balance {solde}",
+    "part.facts_fin": "Expenses {dep} · Funding {fin} · Balance {solde}",
+    "part.facts_total": "Expenses {dep} · Contributions {app} · Funding {fin} · Sales {ventes} · Balance {solde}",
+    "part.facts_dep_fin": "Expenses {dep} · Funding {fin}",
+    "part.facts_dep_app": "Expenses {dep} · Contributed {app}",
+    "part.seg_financement": " · Funding {fin}",
+    "part.seg_ventes": " · Sales {ventes}",
+    "part.seg_solde": " · Balance {solde}",
+    "part.contributed_in_project": "contributed {amount} in this project",
+    "part.contributed_part_in_project": " · contributed {amount} in this project",
+    "part.contributed": "contributed {amount}",
+    "part.contributed_part": " · contributed {amount}",
+    "part.equal_share_part": " · equal share {amount}",
+    "part.prov_credited": "provisional share credited {amount}",
+    "part.prov_note": "Provisional attribution, in equal shares — it will be confirmed from the transaction records.",
+    "part.ecart_title": "Gap — reference",
+    "charts.by_category": "Expenses by category",
+    "charts.by_project": "Expenses by project",
+    "charts.trend": "Trend — expenses by month",
+    "charts.summaries": "Register summaries",
+    "charts.summaries_hint": "Tap a summary to display it right here. On the summary, “Send to chat” also posts it as an image in your conversation — the same images as the bot's /voir.",
+    "charts.by_project_cards": "Summaries by project",
+    "charts.empty": "No data yet.",
+    "member.apporte": "Contributed",
+    "member.prov_note": "incl. {amount} provisional (2023) — attribution to be confirmed.",
+    "member.depenses_payees": "Expenses paid",
+    "member.depenses_financees": "Expenses funded",
+    "member.dep_count": "{n} expense(s)",
+    "member.participations_title": "Participations by project",
+    "dash.total_in": "Total in",
+    "dash.member_apports": "Member contributions",
+    "dash.financement": "Funding",
+    "dash.ventes": "Sales",
+    "dash.total_out": "Total spent",
+    "dash.solde_global": "Overall balance",
+    "dash.balances_title": "Balances by project",
+    "dash.by_category": "Expenses by category",
+    "pilotage.last_month": "Last active month",
+    "pilotage.by_month": "Expenses by month (recent)",
+    "pilotage.remaining_title": "Remaining by project",
+    "pilotage.deficits": "Projects in the red: {list}.",
+    "pilotage.no_deficits": "No project in the red — everything is funded.",
+    "pilotage.pending_title": "Pending approval",
+    "startup.contributed": "Contributed",
+    "startup.other_in": "Other income",
+    "startup.spent": "Spent",
+    "startup.remaining": "Remaining (pots)",
+    "startup.who_funds": "Who funds",
+    "startup.by_project": "Expenses by project",
+    "startup.burn": "Burn — expenses by month",
+    "startup.footer": "Revenue (sales): {ventes} · external funding: {fin} · committed pending {pending}.",
+    "card.sent_toast": "Summary sent — it is on its way to the chat",
+    "card.member_title": "👤 Summary of {name}",
+    "card.dashboard_title": "📈 Dashboard",
+    "card.pilotage_title": "🧭 What remains to be done",
+    "card.startup_title": "🔥 Overview",
+    "card.back": "← Back",
+    "tab.overview": "Home",
+    "tab.entries": "Entries",
+    "tab.pending": "Pending",
+    "tab.members": "Members",
+    "tab.charts": "Charts",
+    "empty.title": "<strong>Panel reserved for register members.</strong>",
+    "empty.body": "Open this panel from <strong>/start</strong> or <strong>/voir</strong> in your private conversation with <strong>@bizexpensestracker_bot</strong> — the bot loads the figures, signed and up to date."
+  }
+};
+
+/* The active display language: the opener's stored preference as
+ * the snapshot stamped it (`lang` present only for English). */
+let LANG = (panel && panel.lang === "en") ? "en" : "fr";
+
+function tt(key, vars) {
+  let s = (I18N[LANG] && I18N[LANG][key]) || I18N.fr[key] || key;
+  if (vars) {
+    Object.keys(vars).forEach((k) => {
+      s = s.split("{" + k + "}").join(String(vars[k]));
+    });
+  }
+  return s;
+}
+
+/* Static labels: index.html ships the French text (the no-JS
+ * fallback AND today's rendering); these attributes re-render them
+ * from the tables at boot and on every language switch. */
+function applyStaticI18n() {
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    el.textContent = tt(el.getAttribute("data-i18n"));
+  });
+  document.querySelectorAll("[data-i18n-html]").forEach((el) => {
+    el.innerHTML = tt(el.getAttribute("data-i18n-html"));
+  });
+  document.querySelectorAll("[data-i18n-ph]").forEach((el) => {
+    el.setAttribute("placeholder", tt(el.getAttribute("data-i18n-ph")));
+  });
+  document.title = tt("doc.title");
+  document.documentElement.lang = LANG;
+}
+
+function syncLangButtons() {
+  const fr = $("lang-btn-fr"), en = $("lang-btn-en");
+  if (fr) fr.classList.toggle("active", LANG === "fr");
+  if (en) en.classList.toggle("active", LANG === "en");
+}
+
+/* The header FR|EN switch: re-render IMMEDIATELY from the shipped
+ * tables (no round-trip needed for display), and persist the
+ * choice bot-side via sendData `set_language` — it sets the
+ * OPENER's personal preference, never the scope's group language.
+ * (In real Telegram sendData closes the app; the bot confirms in
+ * the chat and the next snapshot carries the new lang.) */
+function setPanelLang(l) {
+  if (l !== "fr" && l !== "en") return;
+  if (l === LANG) { syncLangButtons(); return; }
+  LANG = l;
+  syncLangButtons();
+  applyStaticI18n();
+  render();
+  sendAction("set_language", { lang: l });
+  toast(tt("lang.switched", { name: l === "fr" ? "Français" : "English" }));
+}
+
 /* --------------------------------------------------------------- helpers */
 
 function esc(s) {
@@ -270,8 +676,13 @@ function fmtMoney(n) {
 /* Entry lists travel compact (INTEGRATION.md §3): raw amounts the app
  * formats with fmtMoney, short keys, and one-letter status codes the
  * app maps back to the sheet's exact wording. */
-const STATUS_LABELS = { v: "Validée", o: "Approuvée", a: "En attente", r: "Refusé" };
-function statusLabel(t) { return STATUS_LABELS[t] || t || ""; }
+const STATUS_LABELS = {
+  fr: { v: "Validée", o: "Approuvée", a: "En attente", r: "Refusé" },
+  en: { v: "Validated", o: "Approved", a: "Pending", r: "Rejected" },
+};
+function statusLabel(t) {
+  return (STATUS_LABELS[LANG] || STATUS_LABELS.fr)[t] || t || "";
+}
 
 function haptic(kind, arg) {
   if (!tg || !tg.HapticFeedback) return;
@@ -314,7 +725,7 @@ function sendAction(action, params) {
   });
   if (DEMO) {
     console.log("[demo] sendData:", JSON.stringify(payload));
-    toast("Démo : " + action.replace(/_/g, " ") + " (non envoyé)");
+    toast(tt("demo.toast", { action: action.replace(/_/g, " ") }));
     return;
   }
   /* Per Telegram's contract, sendData delivers a web_app_data service
@@ -330,13 +741,12 @@ function sendAction(action, params) {
  * — sendData there is a silent no-op, which is exactly how a card
  * request vanished on 2026-11-06. In that state the button explains
  * in-app instead of pretending to send. */
-const CHAT_GATE_MSG =
-  "Ouvre le panneau depuis le chat du bot pour recevoir l'image dans le chat";
+const CHAT_GATE_MSG = I18N.fr["chat_gate"];
 
 function deliverToChat(action, params, sentMsg) {
   if (DEMO) {
     haptic("notify", "warning");
-    toast(CHAT_GATE_MSG);
+    toast(tt("chat_gate"));
     return;
   }
   haptic("impact");
@@ -381,7 +791,7 @@ function renderScope() {
       && panel.scope_name === panel.theme.name) {
     els.scopeLine.textContent = panel.theme.header;
   } else if (panel.scope_name) {
-    els.scopeLine.textContent = "Registre — " + panel.scope_name;
+    els.scopeLine.textContent = tt("scope.prefix") + panel.scope_name;
   }
 }
 
@@ -416,16 +826,16 @@ function renderTeams() {
   if (teams.length <= 1) return;
   els.teamsList.innerHTML = teams.map((t) => {
     const current = String(t.id) === String(panel.gid);
-    const label = t.name || ("Équipe " + t.id);
+    const label = t.name || tt("teams.fallback", { id: t.id });
     return (
       '<div class="row entry-row">' +
         '<div class="entry-main">' +
           '<span class="entry-line">' + esc(label) + "</span>" +
-          (current ? '<span class="entry-meta">Équipe affichée</span>' : "") +
+          (current ? '<span class="entry-meta">' + esc(tt("teams.current_meta")) + "</span>" : "") +
         "</div>" +
         (current
-          ? '<span class="pill st-pos">Actuelle</span>'
-          : '<button class="btn btn-mini" data-team="' + esc(t.id) + '">Ouvrir</button>') +
+          ? '<span class="pill st-pos">' + esc(tt("teams.current_pill")) + "</span>"
+          : '<button class="btn btn-mini" data-team="' + esc(t.id) + '">' + esc(tt("teams.open")) + "</button>") +
       "</div>"
     );
   }).join("");
@@ -433,7 +843,7 @@ function renderTeams() {
     b.addEventListener("click", () => {
       haptic("impact");
       sendAction("switch_team", { group_id: b.getAttribute("data-team") });
-      toast("Équipe demandée — le panneau arrive dans le chat");
+      toast(tt("teams.requested"));
     });
   });
 }
@@ -474,13 +884,13 @@ function renderProjects() {
           '<span class="pc-name">' + esc(p.name) + "</span>" +
           '<span class="pill ' + (neg ? "st-neg" : "st-pos") + '">' + esc(fmtMoney(p.solde)) + "</span>" +
         "</div>" +
-        '<div class="row"><span class="row-label">Apports</span>' +
+        '<div class="row"><span class="row-label">' + esc(tt("common.apports")) + "</span>" +
           '<span class="row-value">' + esc(fmtMoney(p.apports)) + "</span></div>" +
-        (p.f ? '<div class="row"><span class="row-label">Financement</span>' +
+        (p.f ? '<div class="row"><span class="row-label">' + esc(tt("common.financement")) + "</span>" +
           '<span class="row-value">' + esc(fmtMoney(p.f)) + "</span></div>" : "") +
-        (p.v ? '<div class="row"><span class="row-label">Ventes</span>' +
+        (p.v ? '<div class="row"><span class="row-label">' + esc(tt("common.ventes")) + "</span>" +
           '<span class="row-value">' + esc(fmtMoney(p.v)) + "</span></div>" : "") +
-        '<div class="row"><span class="row-label">Dépenses</span>' +
+        '<div class="row"><span class="row-label">' + esc(tt("common.depenses")) + "</span>" +
           '<span class="row-value">' + esc(fmtMoney(p.depenses)) + "</span></div>" +
       "</article>"
     );
@@ -500,9 +910,9 @@ function renderProjects() {
 function renderMonth() {
   els.monthYm.textContent = panel.month.ym;
   els.monthDep.textContent = fmtMoney(panel.month.depenses);
-  els.monthDepN.textContent = panel.month.nb_depenses + " dépense(s)";
+  els.monthDepN.textContent = tt("month.depenses_count", { n: panel.month.nb_depenses });
   els.monthApp.textContent = fmtMoney(panel.month.apports);
-  els.monthAppN.textContent = panel.month.nb_apports + " apport(s)";
+  els.monthAppN.textContent = tt("month.apports_count", { n: panel.month.nb_apports });
 }
 
 /* -------------------------------------------------------------- écritures */
@@ -522,7 +932,7 @@ function receiptBtn(e) {
    * the explicit send-to-chat for the photo itself. */
   if (!e.r) return "";
   return '<button class="btn btn-mini" data-receipt="' + esc(e.i) + '">' +
-    icon("send") + " Envoyer dans le chat</button>";
+    icon("send") + " " + esc(tt("common.send_to_chat")) + "</button>";
 }
 
 function entryRow(e, withReceipt) {
@@ -564,19 +974,19 @@ function renderEntries() {
   const miss = showMiss ? (panel.missing_receipts || []).filter((e) => entryMatches(e, q)) : [];
   els.missingWrap.hidden = !showMiss;
   els.missingList.innerHTML = miss.map((e) => entryRow(e, false)).join("") ||
-    '<p class="entry-meta pad">Aucune dépense sans justificatif. ✅</p>';
+    '<p class="entry-meta pad">' + esc(tt("entries.none_missing")) + "</p>";
 
   els.entriesEmpty.hidden = !((showDep && !deps.length && !showMiss) ||
                               (showMiss && !miss.length && !(panel.missing_receipts || []).length));
   els.searchScope.textContent =
-    "Recherche dans les " + panel.recent.length + " dernières dépenses chargées" +
-    (panel.missing_count ? " · " + panel.missing_count + " sans justificatif au total." : ".");
+    tt("entries.search_scope", { n: panel.recent.length }) +
+    (panel.missing_count ? tt("entries.search_missing", { n: panel.missing_count }) : tt("entries.search_end"));
 
   els.recentList.querySelectorAll("button[data-receipt]").forEach((b) => {
     b.addEventListener("click", () =>
       deliverToChat("send_receipt",
         { entry_id: b.getAttribute("data-receipt") },
-        "Justificatif demandé — il arrive dans le chat"));
+        tt("receipt.sent_toast")));
   });
 }
 
@@ -656,14 +1066,13 @@ els.formDepense.addEventListener("submit", (ev) => {
   };
   if (payer === "Caisse" || payer === "Autre") fields.funder = $("fd-funder").value;
   if (!fields.amount || fields.amount <= 0 || !fields.description) {
-    toast("Montant et libellé sont obligatoires.");
+    toast(tt("form.dep_required"));
     return;
   }
-  confirmDo("Enregistrer cette dépense de " + fmtMoney(fields.amount) + " ? " +
-            "Elle partira en attente d'approbation.", () => {
+  confirmDo(tt("form.dep_confirm", { amount: fmtMoney(fields.amount) }), () => {
     haptic("notify", "success");
     sendAction("create_depense", { fields: fields });
-    toast("Dépense envoyée au bot");
+    toast(tt("form.dep_sent"));
     toggleForm(null, false);
     els.formDepense.reset();
     setupForms();
@@ -678,14 +1087,13 @@ els.formApport.addEventListener("submit", (ev) => {
     method: $("fa-method").value,
   };
   if (!fields.amount || fields.amount <= 0) {
-    toast("Le montant est obligatoire.");
+    toast(tt("form.amount_required"));
     return;
   }
-  confirmDo("Enregistrer cet apport de " + fmtMoney(fields.amount) + " ? " +
-            "Il partira en attente d'approbation.", () => {
+  confirmDo(tt("form.app_confirm", { amount: fmtMoney(fields.amount) }), () => {
     haptic("notify", "success");
     sendAction("create_apport", { fields: fields });
-    toast("Apport envoyé au bot");
+    toast(tt("form.app_sent"));
     toggleForm(null, false);
     els.formApport.reset();
     setupForms();
@@ -736,19 +1144,19 @@ function renderPending() {
     const actions = e.ca
       ? '<div class="entry-actions">' +
           '<button class="btn btn-approve" data-act="approve_entry" data-id="' + esc(e.i) + '">' +
-            icon("check") + " Approuver</button>" +
+            icon("check") + " " + esc(tt("pending.approve")) + "</button>" +
           '<button class="btn btn-reject" data-act="reject_entry" data-id="' + esc(e.i) + '">' +
-            icon("x") + " Refuser</button>" +
+            icon("x") + " " + esc(tt("pending.reject")) + "</button>" +
         "</div>"
-      : '<p class="self-note">Tu as payé ou saisi cette écriture — un autre membre doit décider.</p>';
+      : '<p class="self-note">' + esc(tt("pending.self_note")) + "</p>";
     const who = isApp
-      ? "Apport de : " + esc(e.m) + " · Saisi par : " + esc(e.l)
-      : "Payeur : " + esc(e.p) + " · Saisi par : " + esc(e.l);
+      ? esc(tt("pending.app_who", { m: e.m, l: e.l }))
+      : esc(tt("pending.dep_who", { p: e.p, l: e.l }));
     return (
       '<article class="pending-card">' +
         '<div class="pc-top">' +
           '<span class="entry-amount">' + esc(fmtMoney(e.a)) + "</span>" +
-          '<span class="kind-badge">' + (isApp ? "💰 Apport" : "💸 Dépense") + "</span>" +
+          '<span class="kind-badge">' + esc(tt(isApp ? "pending.kind_apport" : "pending.kind_depense")) + "</span>" +
         "</div>" +
         '<p class="entry-desc">' + esc(e.s) +
           ' <span class="entry-id mono">' + esc(e.i) + "</span></p>" +
@@ -760,8 +1168,8 @@ function renderPending() {
       "</article>"
     );
   }).join("") + (total > shown
-    ? '<p class="entry-meta pad">Les ' + shown + " plus anciennes sont affichées, sur " +
-      total + " en attente au total — les suivantes apparaissent à mesure que celles-ci sont décidées.</p>"
+    ? '<p class="entry-meta pad">' +
+      esc(tt("pending.oldest_note", { shown: shown, total: total })) + "</p>"
     : "");
 
   els.pendingList.querySelectorAll("button[data-act]").forEach((b) => {
@@ -771,16 +1179,16 @@ function renderPending() {
     b.addEventListener("click", () =>
       deliverToChat("send_receipt",
         { entry_id: b.getAttribute("data-receipt") },
-        "Justificatif demandé — il arrive dans le chat"));
+        tt("receipt.sent_toast")));
   });
 }
 
 function decide(action, entryId) {
   const entry = panel.pending.find((e) => e.i === entryId);
   if (!entry) return;
-  const verb = action === "approve_entry" ? "Approuver" : "Refuser";
-  const msg = verb + " l'écriture " + entryId + " (" + fmtMoney(entry.a) + ") — " +
-              entry.s + " ?";
+  const verb = tt(action === "approve_entry" ? "pending.approve" : "pending.reject");
+  const msg = tt("pending.decide_confirm", {
+    verb: verb, id: entryId, amount: fmtMoney(entry.a), desc: entry.s });
   confirmDo(msg, () => {
     haptic("notify", action === "approve_entry" ? "success" : "warning");
     sendAction(action, { entry_id: entryId });
@@ -791,7 +1199,7 @@ function decide(action, entryId) {
       panel.pending_count = Math.max(panel.pending.length, panel.pending_count - 1);
     }
     renderPending();
-    toast((action === "approve_entry" ? "Approuvée" : "Refusée") + " — envoyé au bot");
+    toast(tt(action === "approve_entry" ? "pending.approved_toast" : "pending.rejected_toast"));
   });
 }
 
@@ -802,15 +1210,15 @@ function renderMembers() {
     '<div class="row entry-row">' +
       '<div class="entry-main">' +
         '<span class="entry-line">' + esc(m.name) + "</span>" +
-        '<span class="entry-meta">Apports ' + esc(fmtMoney(m.apports)) +
-          (m.prov ? " · dont " + esc(fmtMoney(m.prov)) + " provisoire (2023)" : "") +
-          " · payé " + esc(fmtMoney(m.depenses_payees)) +
-          " · " + m.nb_depenses + " dépense(s)</span>" +
+        '<span class="entry-meta">' + esc(tt("members.apports", { amount: fmtMoney(m.apports) })) +
+          (m.prov ? esc(tt("members.prov_part", { amount: fmtMoney(m.prov) })) : "") +
+          esc(tt("members.paid_part", { amount: fmtMoney(m.depenses_payees) })) +
+          esc(tt("members.dep_count", { n: m.nb_depenses })) + "</span>" +
         /* The aggregate line (« Historique (importé) », "h": 1)
          * is NOT a person: no résumé button, no card. */
         (m.h ? "" :
           '<span class="entry-actions mini"><button class="btn btn-mini" data-member-card="' +
-            esc(m.name) + '">' + icon("image") + " Voir le résumé</button></span>") +
+            esc(m.name) + '">' + icon("image") + " " + esc(tt("members.view_summary")) + "</button></span>") +
       "</div>" +
       '<span class="row-value strong">' + esc(fmtMoney((m.apports || 0) + (m.depenses_payees || 0))) + "</span>" +
     "</div>"
@@ -844,9 +1252,10 @@ function renderMembers() {
   els.partWrap.hidden = !parts.length;
   els.partList.innerHTML = parts.map((b) => {
     const title = b.j
-      ? "Participations — " + esc(b.j) + (b.r ? " · réglé" : "") +
-        (b.v ? " · provisoire" : "")
-      : "Participations — Projets suivis";
+      ? esc(tt("part.title_prefix")) + esc(b.j) +
+        (b.r ? esc(tt("part.settled_suffix")) : "") +
+        (b.v ? esc(tt("part.provisional_suffix")) : "")
+      : esc(tt("part.title_total"));
     const totalA = (b.a || []).reduce((s, v) => s + (v || 0), 0);
     /* Facts lines show EVERY money component (complete frame,
      * Landry 2026-11-06): a project block adds its Financement
@@ -859,22 +1268,26 @@ function renderMembers() {
     let factsBody;
     if (!b.j) {
       const provTotal = (b.w || []).reduce((s, v) => s + (v || 0), 0);
-      factsBody = "Dépenses " + esc(fmtMoney(b.d || 0)) +
-        " · Apports " + esc(fmtMoney(totalA - provTotal)) +
-        " · Financement " + esc(fmtMoney(b.f || 0)) +
-        " · Ventes " + esc(fmtMoney(b.x || 0)) +
-        " · Solde " + esc(fmtMoney(b.s || 0));
+      factsBody = esc(tt("part.facts_total", {
+        dep: fmtMoney(b.d || 0),
+        app: fmtMoney(totalA - provTotal),
+        fin: fmtMoney(b.f || 0),
+        ventes: fmtMoney(b.x || 0),
+        solde: fmtMoney(b.s || 0) }));
     } else if (b.v) {
-      factsBody = "Dépenses " + esc(fmtMoney(b.d || 0)) +
-        " · Financement " + esc(fmtMoney(b.f || 0)) +
-        (b.x ? " · Ventes " + esc(fmtMoney(b.x)) : "") +
-        " · Solde " + esc(fmtMoney(b.s || 0));
+      factsBody = esc(tt("part.facts_dep_fin", {
+          dep: fmtMoney(b.d || 0), fin: fmtMoney(b.f || 0) })) +
+        (b.x ? esc(tt("part.seg_ventes",
+                      { ventes: fmtMoney(b.x) })) : "") +
+        esc(tt("part.seg_solde", { solde: fmtMoney(b.s || 0) }));
     } else {
-      factsBody = "Dépenses " + esc(fmtMoney(b.d || 0)) +
-        " · Apporté " + esc(fmtMoney(totalA)) +
-        (b.f ? " · Financement " + esc(fmtMoney(b.f)) : "") +
-        (b.x ? " · Ventes " + esc(fmtMoney(b.x)) : "") +
-        " · Solde " + esc(fmtMoney(b.s || 0));
+      factsBody = esc(tt("part.facts_dep_app", {
+          dep: fmtMoney(b.d || 0), app: fmtMoney(totalA) })) +
+        (b.f ? esc(tt("part.seg_financement",
+                      { fin: fmtMoney(b.f) })) : "") +
+        (b.x ? esc(tt("part.seg_ventes",
+                      { ventes: fmtMoney(b.x) })) : "") +
+        esc(tt("part.seg_solde", { solde: fmtMoney(b.s || 0) }));
     }
     const facts = '<div class="entry-meta part-facts">' +
       factsBody + "</div>";
@@ -891,32 +1304,31 @@ function renderMembers() {
        * Par membre list prints. */
       let meta;
       if (b.v) {
-        meta = "part provisoire créditée " +
-          esc(fmtMoney((b.c || [])[i] || 0)) +
-          (apporte ? " · a apporté " + esc(fmtMoney(apporte)) +
-            " dans ce projet" : "");
+        meta = esc(tt("part.prov_credited",
+                      { amount: fmtMoney((b.c || [])[i] || 0) })) +
+          (apporte ? esc(tt("part.contributed_part_in_project",
+                            { amount: fmtMoney(apporte) })) : "");
       } else if (b.j) {
-        meta = "a apporté " + esc(fmtMoney(apporte)) +
-          " dans ce projet" +
-          (b.r ? " · part égale " + esc(fmtMoney((b.c || [])[i] || 0)) : "");
+        meta = esc(tt("part.contributed_in_project",
+                      { amount: fmtMoney(apporte) })) +
+          (b.r ? esc(tt("part.equal_share_part",
+                        { amount: fmtMoney((b.c || [])[i] || 0) })) : "");
       } else {
-        meta = "a apporté " + esc(fmtMoney(apporte)) +
-          (b.w && b.w[i] ? " · dont " +
-            esc(fmtMoney(b.w[i])) + " provisoire (2023)" : "");
+        meta = esc(tt("part.contributed", { amount: fmtMoney(apporte) })) +
+          (b.w && b.w[i] ? esc(tt("members.prov_part",
+                                  { amount: fmtMoney(b.w[i]) })) : "");
       }
       return '<div class="row entry-row">' +
         '<div class="entry-main">' +
           '<span class="entry-line">' + esc(name) + "</span>" +
           '<span class="entry-meta">' + meta + "</span>" +
         "</div>" +
-        '<span class="pill pill-ref" title="Écart — repère">' +
+        '<span class="pill pill-ref" title="' + esc(tt("part.ecart_title")) + '">' +
           esc(fmtMoney(ecart)) + "</span>" +
       "</div>";
     }).join("");
     const note = b.v
-      ? '<p class="entry-meta pad">Attribution provisoire, en parts ' +
-        "égales — elle sera confirmée à partir des relevés de " +
-        "transactions.</p>"
+      ? '<p class="entry-meta pad">' + esc(tt("part.prov_note")) + "</p>"
       : "";
     return '<div class="part-block"><h4 class="part-title">' + title +
       "</h4>" + facts + rows + note + "</div>";
@@ -927,7 +1339,7 @@ function renderMembers() {
 
 function barChart(el, items) {
   if (!items || !items.length) {
-    el.innerHTML = '<p class="entry-meta pad">Aucune donnée pour le moment.</p>';
+    el.innerHTML = '<p class="entry-meta pad">' + esc(tt("charts.empty")) + "</p>";
     return;
   }
   const max = Math.max.apply(null, items.map((i) => Math.abs(i.v))) || 1;
@@ -1056,14 +1468,14 @@ function barRows(title, items) {
 
 function memberCardHTML(m) {
   const i = panel.members.findIndex((x) => x.name === m.name);
-  let html = moneyRow("Apporté", m.apports || 0);
+  let html = moneyRow(tt("member.apporte"), m.apports || 0);
   if (m.prov) {
-    html += '<p class="entry-meta">dont ' + esc(fmtMoney(m.prov)) +
-      " provisoire (2023) — attribution à confirmer.</p>";
+    html += '<p class="entry-meta">' +
+      esc(tt("member.prov_note", { amount: fmtMoney(m.prov) })) + "</p>";
   }
-  html += moneyRow("Dépenses payées", m.depenses_payees || 0);
-  html += cardRow("Dépenses financées",
-                  String(m.nb_depenses || 0) + " dépense(s)");
+  html += moneyRow(tt("member.depenses_payees"), m.depenses_payees || 0);
+  html += cardRow(tt("member.depenses_financees"),
+                  tt("member.dep_count", { n: m.nb_depenses || 0 }));
   /* Participations par projet: this member's line of each block
    * (same rendering rules as the Membres view: settled blocks
    * credit the equal share, provisional blocks the provisional
@@ -1077,30 +1489,32 @@ function memberCardHTML(m) {
      * the global figure. */
     let meta;
     if (b.v) {
-      meta = "part provisoire créditée " +
-        esc(fmtMoney((b.c || [])[i] || 0)) +
-        (apporte ? " · a apporté " + esc(fmtMoney(apporte)) +
-          " dans ce projet" : "");
+      meta = esc(tt("part.prov_credited",
+                    { amount: fmtMoney((b.c || [])[i] || 0) })) +
+        (apporte ? esc(tt("part.contributed_part_in_project",
+                          { amount: fmtMoney(apporte) })) : "");
     } else if (b.j) {
-      meta = "a apporté " + esc(fmtMoney(apporte)) +
-        " dans ce projet" +
-        (b.r ? " · part égale " + esc(fmtMoney((b.c || [])[i] || 0)) : "");
+      meta = esc(tt("part.contributed_in_project",
+                    { amount: fmtMoney(apporte) })) +
+        (b.r ? esc(tt("part.equal_share_part",
+                      { amount: fmtMoney((b.c || [])[i] || 0) })) : "");
     } else {
-      meta = "a apporté " + esc(fmtMoney(apporte)) +
+      meta = esc(tt("part.contributed", { amount: fmtMoney(apporte) })) +
         (b.w && b.w[i]
-          ? " · dont " + esc(fmtMoney(b.w[i])) + " provisoire (2023)" : "");
+          ? esc(tt("members.prov_part", { amount: fmtMoney(b.w[i]) })) : "");
     }
     const title = b.j
-      ? esc(b.j) + (b.r ? " · réglé" : "") + (b.v ? " · provisoire" : "")
-      : "Projets suivis";
+      ? esc(b.j) + (b.r ? esc(tt("part.settled_suffix")) : "") +
+        (b.v ? esc(tt("part.provisional_suffix")) : "")
+      : esc(tt("part.followed"));
     return '<div class="row entry-row"><div class="entry-main">' +
       '<span class="entry-line">' + title + "</span>" +
       '<span class="entry-meta">' + meta + "</span></div>" +
-      '<span class="pill pill-ref" title="Écart — repère">' +
+      '<span class="pill pill-ref" title="' + esc(tt("part.ecart_title")) + '">' +
       esc(fmtMoney(ecart)) + "</span></div>";
   }).join("");
   if (blocks) {
-    html += '<h3 class="card-title">Participations par projet</h3>' + blocks;
+    html += '<h3 class="card-title">' + esc(tt("member.participations_title")) + "</h3>" + blocks;
   }
   return html;
 }
@@ -1110,11 +1524,11 @@ function projectCardHTML(p) {
    * project's Financement / Ventes lines print when the project
    * has that money — the same conditionality as its Budget
    * card. */
-  let html = moneyRow("Apports", p.apports || 0);
-  if (p.f) html += moneyRow("Financement", p.f);
-  if (p.v) html += moneyRow("Ventes", p.v);
-  html += moneyRow("Dépenses", p.depenses || 0);
-  html += pillRow("Solde", p.solde || 0);
+  let html = moneyRow(tt("common.apports"), p.apports || 0);
+  if (p.f) html += moneyRow(tt("common.financement"), p.f);
+  if (p.v) html += moneyRow(tt("common.ventes"), p.v);
+  html += moneyRow(tt("common.depenses"), p.depenses || 0);
+  html += pillRow(tt("common.solde"), p.solde || 0);
   return html;
 }
 
@@ -1126,18 +1540,19 @@ function dashboardCardHTML() {
    * and the Participations header. This is a global card:
    * every component line ALWAYS prints (0 included), so the
    * arithmetic is checkable on screen. */
-  let html = moneyRow("Total entré", t.app + fin + ventes);
-  html += moneyRow("Apports des membres", t.app);
-  html += moneyRow("Financement", fin);
-  html += moneyRow("Ventes", ventes);
-  html += moneyRow("Total dépensé", t.dep);
-  html += moneyRow("Solde global", t.app + fin + ventes - t.dep);
-  html += cardRow("En attente",
-    String(panel.pending_count || 0) + " · " + esc(fmtMoney(pendingSum())));
-  html += cardRow("Sans justificatif", String(panel.missing_count || 0));
-  html += '<h3 class="card-title">Soldes par projet</h3>' +
+  let html = moneyRow(tt("dash.total_in"), t.app + fin + ventes);
+  html += moneyRow(tt("dash.member_apports"), t.app);
+  html += moneyRow(tt("dash.financement"), fin);
+  html += moneyRow(tt("dash.ventes"), ventes);
+  html += moneyRow(tt("dash.total_out"), t.dep);
+  html += moneyRow(tt("dash.solde_global"), t.app + fin + ventes - t.dep);
+  html += cardRow(tt("common.pending"),
+    tt("common.count_money", { n: panel.pending_count || 0,
+                               amount: fmtMoney(pendingSum()) }));
+  html += cardRow(tt("common.no_receipt"), String(panel.missing_count || 0));
+  html += '<h3 class="card-title">' + esc(tt("dash.balances_title")) + "</h3>" +
     effectiveProjects().map((p) => pillRow(p.name, p.solde)).join("");
-  html += barRows("Dépenses par catégorie",
+  html += barRows(tt("dash.by_category"),
     ((panel.charts || {}).by_category || []).map((c) => [c.l, c.v]));
   return html;
 }
@@ -1145,26 +1560,27 @@ function dashboardCardHTML() {
 function pilotageCardHTML() {
   const months = (panel.charts || {}).months || [];
   const last = months.length ? months[months.length - 1] : null;
-  let html = cardRow("En attente",
-    String(panel.pending_count || 0) + " · " + esc(fmtMoney(pendingSum())));
-  html += cardRow("Sans justificatif", String(panel.missing_count || 0));
-  html += cardRow("Dernier mois actif",
+  let html = cardRow(tt("common.pending"),
+    tt("common.count_money", { n: panel.pending_count || 0,
+                               amount: fmtMoney(pendingSum()) }));
+  html += cardRow(tt("common.no_receipt"), String(panel.missing_count || 0));
+  html += cardRow(tt("pilotage.last_month"),
     last ? esc(last.m) + " · " + esc(fmtMoney(last.v)) : "—");
-  html += barRows("Dépenses par mois (récent)",
+  html += barRows(tt("pilotage.by_month"),
     months.map((m) => [m.m, m.v]));
   const eff = effectiveProjects();
   const balances = eff.filter((p) => p.solde > 0);
   if (balances.length) {
-    html += '<h3 class="card-title">Restant par projet</h3>' +
+    html += '<h3 class="card-title">' + esc(tt("pilotage.remaining_title")) + "</h3>" +
       balances.map((p) => moneyRow(p.name, p.solde)).join("");
   }
   const deficits = eff.filter((p) => p.solde < 0);
   html += '<p class="entry-meta pad">' + (deficits.length
-    ? "Projets en négatif : " +
-      deficits.map((p) => esc(p.name) + " " + esc(fmtMoney(p.solde))).join(" · ") + "."
-    : "Aucun projet en négatif — tout est financé.") + "</p>";
+    ? esc(tt("pilotage.deficits", {
+        list: deficits.map((p) => p.name + " " + fmtMoney(p.solde)).join(" · ") }))
+    : esc(tt("pilotage.no_deficits"))) + "</p>";
   if ((panel.pending || []).length) {
-    html += '<h3 class="card-title">En attente d\'approbation</h3>' +
+    html += '<h3 class="card-title">' + esc(tt("pilotage.pending_title")) + "</h3>" +
       panel.pending.map((e) =>
         '<div class="row entry-row"><div class="entry-main">' +
           '<span class="entry-line">' + esc(e.s) + "</span>" +
@@ -1180,28 +1596,27 @@ function startupCardHTML() {
   const fin = srcFin(), ventes = srcVentes();
   const eff = effectiveProjects();
   const pots = eff.reduce((s, p) => s + Math.max(0, p.solde), 0);
-  let html = moneyRow("Contribué", t.app);
-  html += moneyRow("Autres entrées", fin);
-  html += moneyRow("Dépensé", t.dep);
-  html += moneyRow("Restant (pots)", pots);
+  let html = moneyRow(tt("startup.contributed"), t.app);
+  html += moneyRow(tt("startup.other_in"), fin);
+  html += moneyRow(tt("startup.spent"), t.dep);
+  html += moneyRow(tt("startup.remaining"), pots);
   /* Qui finance: recorded member apports (the provisional credit
    * is NOT a recorded apport — it comes back out via `prov`),
    * then the REV sources, biggest first like the chat card. */
   const funders = panel.members
     .map((m) => ({ name: m.name, v: (m.apports || 0) - (m.prov || 0) }))
     .filter((f) => f.v > 0);
-  if (fin) funders.push({ name: "Financement", v: fin });
-  if (ventes) funders.push({ name: "Ventes", v: ventes });
+  if (fin) funders.push({ name: tt("dash.financement"), v: fin });
+  if (ventes) funders.push({ name: tt("dash.ventes"), v: ventes });
   funders.sort((a, b) => b.v - a.v);
-  html += barRows("Qui finance", funders.map((f) => [f.name, f.v]));
-  html += barRows("Dépenses par projet",
+  html += barRows(tt("startup.who_funds"), funders.map((f) => [f.name, f.v]));
+  html += barRows(tt("startup.by_project"),
     panel.projects.map((p) => [p.name, p.depenses || 0]));
-  html += barRows("Burn — dépenses par mois",
+  html += barRows(tt("startup.burn"),
     ((panel.charts || {}).months || []).map((m) => [m.m, m.v]));
-  html += '<p class="entry-meta pad">Revenus (ventes) : ' +
-    esc(fmtMoney(ventes)) + " · financements externes : " +
-    esc(fmtMoney(fin)) + " · engagé en attente " +
-    esc(fmtMoney(pendingSum())) + ".</p>";
+  html += '<p class="entry-meta pad">' +
+    esc(tt("startup.footer", { ventes: fmtMoney(ventes),
+          fin: fmtMoney(fin), pending: fmtMoney(pendingSum()) })) + "</p>";
   return html;
 }
 
@@ -1215,11 +1630,11 @@ function openCard(kind, name) {
   }
   let title = "", body = "";
   cardSendSpec = { action: "send_chart",
-                   params: { chart: kind }, sent: "Résumé envoyé — il arrive dans le chat" };
+                   params: { chart: kind }, sent: tt("card.sent_toast") };
   if (kind === "membre") {
     const m = panel.members.find((x) => x.name === name);
     if (!m) return;
-    title = "👤 Résumé de " + m.name;
+    title = tt("card.member_title", { name: m.name });
     body = memberCardHTML(m);
     cardSendSpec.params = { chart: "membre", name: m.name };
   } else if (kind === "projet") {
@@ -1229,20 +1644,20 @@ function openCard(kind, name) {
     body = projectCardHTML(p);
     cardSendSpec.params = { chart: "projet", name: p.name };
   } else if (kind === "dashboard") {
-    title = "📈 Tableau de bord";
+    title = tt("card.dashboard_title");
     body = dashboardCardHTML();
   } else if (kind === "pilotage") {
-    title = "🧭 Ce qui reste à faire";
+    title = tt("card.pilotage_title");
     body = pilotageCardHTML();
   } else if (kind === "startup") {
-    title = "🔥 Vue d'ensemble";
+    title = tt("card.startup_title");
     body = startupCardHTML();
   } else {
     return;
   }
   els.cardTitle.textContent = title;
   els.cardBody.innerHTML = body;
-  els.cardNote.textContent = DEMO ? CHAT_GATE_MSG : "";
+  els.cardNote.textContent = DEMO ? tt("chat_gate") : "";
   haptic("impact");
   showView("card");
 }
@@ -1257,6 +1672,8 @@ els.cardSend.addEventListener("click", () => {
 /* ------------------------------------------------------------------ boot */
 
 function render() {
+  applyStaticI18n();
+  syncLangButtons();
   applyTheme();
   renderScope();
   renderTeams();
@@ -1270,10 +1687,16 @@ function render() {
   setupForms();
 }
 
+const langBtnFr = $("lang-btn-fr"), langBtnEn = $("lang-btn-en");
+if (langBtnFr) langBtnFr.addEventListener("click", () => setPanelLang("fr"));
+if (langBtnEn) langBtnEn.addEventListener("click", () => setPanelLang("en"));
+
 if (panel) {
   els.main.hidden = false;
   els.tabbar.hidden = false;
   render();
 } else {
+  applyStaticI18n();
+  syncLangButtons();
   els.empty.hidden = false;
 }
