@@ -114,6 +114,20 @@ const els = {
   memberList: $("member-list"),
   partWrap: $("participations-wrap"),
   partList: $("participations-list"),
+  adjWrap: $("adjust-wrap"),
+  adjForm: $("form-adjust"),
+  adjContext: $("adj-context"),
+  adjCurrent: $("adj-current"),
+  adjOpts: $("adj-opts"),
+  adjField: $("adj-field"),
+  adjFieldLabel: $("adj-field-label"),
+  adjInput: $("adj-input"),
+  adjPreview: $("adj-preview"),
+  adjPreviewBody: $("adj-preview-body"),
+  adjError: $("adj-error"),
+  adjApply: $("adj-apply"),
+  adjBack: $("adj-back"),
+  adjCancel: $("adj-cancel"),
   chartCategory: $("chart-category"),
   chartProject: $("chart-project"),
   chartMonths: $("chart-months"),
@@ -383,6 +397,32 @@ const I18N = {
     "part.prov_credited": "part provisoire créditée {amount}",
     "part.prov_note": "Attribution provisoire, en parts égales — elle sera confirmée à partir des relevés de transactions.",
     "part.ecart_title": "Écart — repère",
+    "part.credited_title": "Part créditée",
+    "part.adjusted": "ajusté",
+    "part.adjust_hint": "Touche un membre d'un projet pour ajuster sa participation : le retirer du projet, lui donner une part personnalisée, ou corriger son montant.",
+    "part.removed_suffix": " · retiré du projet",
+    "adj.title": "Ajuster la participation",
+    "adj.current": "Ajustement actuel : {detail}",
+    "adj.detail_retirer": "retiré du projet",
+    "adj.detail_part": "part personnalisée : {value} %",
+    "adj.detail_corriger": "montant corrigé : {value}",
+    "adj.opt_retirer": "Retirer du projet",
+    "adj.opt_retirer_sub": "Il garde ce qu'il a apporté ; les autres se répartissent le reste.",
+    "adj.opt_part": "Part personnalisée",
+    "adj.opt_part_sub": "Un pourcentage du projet, au lieu du partage égal.",
+    "adj.opt_corriger": "Corriger le montant",
+    "adj.opt_corriger_sub": "Le montant exact de sa part — pour un projet provisoire, de son crédit.",
+    "adj.pct_label": "Pourcentage du projet (%)",
+    "adj.amount_label": "Montant (FCFA)",
+    "adj.preview_title": "Après l'ajustement",
+    "adj.preview_removed": "retiré",
+    "adj.preview_part": "part {amount}",
+    "adj.preview_credit": "crédit {amount}",
+    "adj.apply": "Appliquer",
+    "adj.cancel_adj": "Annuler l'ajustement",
+    "adj.invalid": "Cet ajustement laisserait une part négative à un membre — vérifie le montant.",
+    "adj.sent": "Correction envoyée au bot.",
+    "adj.cancel_sent": "Annulation envoyée au bot.",
     "charts.by_category": "Dépenses par catégorie",
     "charts.by_project": "Dépenses par projet",
     "charts.trend": "Tendance — dépenses par mois",
@@ -550,6 +590,32 @@ const I18N = {
     "part.prov_credited": "provisional share credited {amount}",
     "part.prov_note": "Provisional attribution, in equal shares — it will be confirmed from the transaction records.",
     "part.ecart_title": "Gap — reference",
+    "part.credited_title": "Credited share",
+    "part.adjusted": "adjusted",
+    "part.adjust_hint": "Tap a member in a project to adjust their participation: remove them from the project, give them a custom share, or correct their amount.",
+    "part.removed_suffix": " · removed from the project",
+    "adj.title": "Adjust the participation",
+    "adj.current": "Current adjustment: {detail}",
+    "adj.detail_retirer": "removed from the project",
+    "adj.detail_part": "custom share: {value}%",
+    "adj.detail_corriger": "corrected amount: {value}",
+    "adj.opt_retirer": "Remove from the project",
+    "adj.opt_retirer_sub": "They keep what they contributed; the others split the rest.",
+    "adj.opt_part": "Custom share",
+    "adj.opt_part_sub": "A percentage of the project, instead of the equal split.",
+    "adj.opt_corriger": "Correct the amount",
+    "adj.opt_corriger_sub": "The exact amount of their share — for a provisional project, of their credit.",
+    "adj.pct_label": "Percentage of the project (%)",
+    "adj.amount_label": "Amount (FCFA)",
+    "adj.preview_title": "After the adjustment",
+    "adj.preview_removed": "removed",
+    "adj.preview_part": "share {amount}",
+    "adj.preview_credit": "credit {amount}",
+    "adj.apply": "Apply",
+    "adj.cancel_adj": "Cancel the adjustment",
+    "adj.invalid": "This adjustment would leave a member with a negative share — check the amount.",
+    "adj.sent": "Correction sent to the bot.",
+    "adj.cancel_sent": "Cancellation sent to the bot.",
     "charts.by_category": "Expenses by category",
     "charts.by_project": "Expenses by project",
     "charts.trend": "Trend — expenses by month",
@@ -1100,6 +1166,211 @@ els.formApport.addEventListener("submit", (ev) => {
   });
 });
 
+/* ------------------------------------------------- ajuster (participations) */
+
+/* The « Ajuster » sheet (Landry, 2026-11-07 — designed 2026-11-06):
+ * opened by tapping a member in a project's Participations block;
+ * project + member arrive WITH the tap (prefilled, never asked).
+ * Exactly three operations — Retirer du projet · Part
+ * personnalisée · Corriger le montant — one decision at a time:
+ * the value field appears only for the operation that needs it,
+ * and the consequence (every participant's resulting part) is
+ * previewed, biggest on the sheet, BEFORE « Appliquer ». Applying
+ * sends the correction to the bot (no approval step — it applies
+ * at once), which logs it in the register's « Ajustements » tab
+ * with its author; an existing correction shows at the top of the
+ * sheet, and its « Annuler l'ajustement » sits quiet and last. */
+let adjState = null;
+
+function adjDetailText(z) {
+  if (!z) return "";
+  if (z[0] === "r") return tt("adj.detail_retirer");
+  if (z[0] === "p") return tt("adj.detail_part", { value: String(z[1]) });
+  return tt("adj.detail_corriger", { value: fmtMoney(z[1]) });
+}
+
+function openAdjust(bi, i) {
+  const b = (panel.participations || [])[bi];
+  if (!b || !b.j) return;
+  adjState = { bi: bi, i: i, kind: null };
+  els.adjContext.textContent =
+    ((panel.members[i] || {}).name || "") + " — " + b.j;
+  const z = b.z && b.z[i];
+  els.adjCurrent.hidden = !z;
+  if (z) {
+    els.adjCurrent.textContent =
+      tt("adj.current", { detail: adjDetailText(z) });
+  }
+  els.adjCancel.hidden = !z;
+  /* Pre-select the current correction, if any, so the member
+   * sees the settings as they stand and can just tweak them. */
+  els.adjInput.value = "";
+  if (z && z[0] === "p") selectAdjKind("part", z[1]);
+  else if (z && z[0] === "c") selectAdjKind("corriger", z[1]);
+  else if (z) selectAdjKind("retirer");
+  else refreshAdjust();
+  els.adjWrap.hidden = false;
+  els.adjWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function closeAdjust() {
+  adjState = null;
+  if (els.adjWrap) els.adjWrap.hidden = true;
+}
+
+function selectAdjKind(kind, preset) {
+  if (!adjState) return;
+  adjState.kind = kind;
+  if (preset !== undefined && preset !== null) {
+    els.adjInput.value = preset;
+  }
+  refreshAdjust();
+}
+
+function adjParticipants(b) {
+  const idx = [];
+  (b.a || []).forEach((_v, j) => { if (!b.p || b.p[j]) idx.push(j); });
+  return idx;
+}
+
+/* The split AFTER the pending correction, computed exactly as the
+ * server computes it (core.participations_breakdown): fixed
+ * shares/credits first, removed members out of the pot, the
+ * unadjusted split the rest equally. Returns {parts, removed,
+ * credit} — "credit" marks a provisional block, whose previewed
+ * figure is the member's crédit — or null when the pending value
+ * is missing or out of range. Negative results ride along so the
+ * sheet can flag them (the server refuses them too). */
+function adjCompute() {
+  const b = (panel.participations || [])[adjState.bi];
+  const kind = adjState.kind;
+  if (!kind) return null;
+  let value = null;
+  if (kind !== "retirer") {
+    value = parseFloat(String(els.adjInput.value || "")
+      .replace(/\s/g, "").replace(",", "."));
+    if (isNaN(value)) return null;
+    if (kind === "part" && !(value > 0 && value <= 100)) return null;
+    if (kind === "corriger" &&
+        (value < 0 || value !== Math.round(value))) return null;
+  }
+  const parts = adjParticipants(b);
+  const eff = {};
+  parts.forEach((j) => {
+    const z = b.z && b.z[j];
+    if (z) {
+      eff[j] = [{ r: "retirer", p: "part", c: "corriger" }[z[0]], z[1]];
+    }
+  });
+  eff[adjState.i] = [kind, value];
+  const removed = new Set(
+    parts.filter((j) => eff[j] && eff[j][0] === "retirer"));
+  const active = parts.filter((j) => !removed.has(j));
+  const out = {};
+  if (b.v) {
+    const fin = b.f || 0;
+    const fixed = {};
+    active.forEach((j) => {
+      const e = eff[j];
+      if (e && e[0] === "corriger") fixed[j] = e[1];
+      else if (e && e[0] === "part") fixed[j] = fin * e[1] / 100;
+    });
+    const rest = active.filter((j) => !(j in fixed));
+    const restVal = rest.length
+      ? (fin - Object.values(fixed).reduce((s, v) => s + v, 0)) / rest.length
+      : 0;
+    active.forEach((j) => { out[j] = (j in fixed) ? fixed[j] : restVal; });
+    return { parts: out, removed: removed, credit: true };
+  }
+  const total = parts.reduce((s, j) => s + ((b.a || [])[j] || 0), 0);
+  const fixed = {};
+  active.forEach((j) => {
+    const e = eff[j];
+    if (e && e[0] === "corriger") fixed[j] = e[1];
+    else if (e && e[0] === "part") fixed[j] = total * e[1] / 100;
+  });
+  const rest = active.filter((j) => !(j in fixed));
+  const removedSum = parts.filter((j) => removed.has(j))
+    .reduce((s, j) => s + ((b.a || [])[j] || 0), 0);
+  const restVal = rest.length
+    ? (total - removedSum -
+       Object.values(fixed).reduce((s, v) => s + v, 0)) / rest.length
+    : 0;
+  active.forEach((j) => { out[j] = (j in fixed) ? fixed[j] : restVal; });
+  return { parts: out, removed: removed, credit: false };
+}
+
+function refreshAdjust() {
+  if (!adjState) return;
+  const kind = adjState.kind;
+  els.adjOpts.querySelectorAll(".adj-opt").forEach((o) => {
+    o.classList.toggle("active", o.getAttribute("data-kind") === kind);
+  });
+  const needsValue = kind === "part" || kind === "corriger";
+  els.adjField.hidden = !needsValue;
+  if (needsValue) {
+    els.adjFieldLabel.textContent =
+      tt(kind === "part" ? "adj.pct_label" : "adj.amount_label");
+  }
+  const res = adjCompute();
+  const b = (panel.participations || [])[adjState.bi];
+  els.adjPreview.hidden = !res;
+  els.adjError.hidden = true;
+  let valid = !!res;
+  if (res) {
+    if (Object.values(res.parts).some((v) => v < -0.01)) {
+      valid = false;
+      els.adjError.hidden = false;
+      els.adjError.textContent = tt("adj.invalid");
+    }
+    els.adjPreviewBody.innerHTML = adjParticipants(b).map((j) => {
+      const name = (panel.members[j] || {}).name || "";
+      if (res.removed.has(j)) {
+        return '<div class="adj-line"><span>' + esc(name) + "</span>" +
+          '<span class="adj-removed">' +
+          esc(tt("adj.preview_removed")) + "</span></div>";
+      }
+      const label = tt(res.credit ? "adj.preview_credit" : "adj.preview_part",
+                       { amount: fmtMoney(res.parts[j] || 0) });
+      return '<div class="adj-line"><span>' + esc(name) + "</span>" +
+        "<strong>" + esc(label) + "</strong></div>";
+    }).join("");
+  }
+  els.adjApply.disabled = !valid;
+}
+
+els.adjOpts.querySelectorAll(".adj-opt").forEach((o) => {
+  o.addEventListener("click", () => {
+    haptic("impact");
+    selectAdjKind(o.getAttribute("data-kind"));
+  });
+});
+els.adjInput.addEventListener("input", refreshAdjust);
+els.adjBack.addEventListener("click", closeAdjust);
+els.adjCancel.addEventListener("click", () => {
+  if (!adjState) return;
+  const b = (panel.participations || [])[adjState.bi];
+  const name = (panel.members[adjState.i] || {}).name || "";
+  sendAction("cancel_adjustment", { project: b.j, member: name });
+  toast(tt("adj.cancel_sent"));
+  closeAdjust();
+});
+els.adjForm.addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  if (!adjState || els.adjApply.disabled) return;
+  const b = (panel.participations || [])[adjState.bi];
+  const name = (panel.members[adjState.i] || {}).name || "";
+  const payload = { project: b.j, member: name, kind: adjState.kind };
+  const raw = parseFloat(String(els.adjInput.value || "")
+    .replace(/\s/g, "").replace(",", "."));
+  if (adjState.kind === "part") payload.value = raw;
+  else if (adjState.kind === "corriger") payload.value = Math.round(raw);
+  haptic("notify", "success");
+  sendAction("adjust_participation", payload);
+  toast(tt("adj.sent"));
+  closeAdjust();
+});
+
 /* ------------------------------------------------------------ importer */
 
 /* The guided ingestion's panel entry (Stage 3): PERMANENTLY
@@ -1205,6 +1476,20 @@ function decide(action, entryId) {
 
 /* ---------------------------------------------------------------- membres */
 
+/* The headline figure of a participations member line (Landry,
+ * 2026-11-07): on a block that CREDITS a part — settled (« réglé »)
+ * or provisional — the headline is that credited part (Tokyo8:
+ * 75 000), NOT the écart, which is 0 there by construction and
+ * read as a bug ("why 0 FCFA in front, it should have the
+ * 75 000"). Plain tracked blocks keep the écart — there it IS
+ * the member's position, the neutral repère. */
+function partHeadline(b, i) {
+  if (b.r || b.v) {
+    return { value: (b.c || [])[i] || 0, title: tt("part.credited_title") };
+  }
+  return { value: (b.e || [])[i] || 0, title: tt("part.ecart_title") };
+}
+
 function renderMembers() {
   els.memberList.innerHTML = panel.members.map((m) =>
     '<div class="row entry-row">' +
@@ -1250,7 +1535,7 @@ function renderMembers() {
    * block's "w" shows each member's provisional part of his total. */
   const parts = panel.participations || [];
   els.partWrap.hidden = !parts.length;
-  els.partList.innerHTML = parts.map((b) => {
+  els.partList.innerHTML = parts.map((b, bi) => {
     const title = b.j
       ? esc(tt("part.title_prefix")) + esc(b.j) +
         (b.r ? esc(tt("part.settled_suffix")) : "") +
@@ -1293,8 +1578,13 @@ function renderMembers() {
       factsBody + "</div>";
     const rows = (b.a || []).map((apporte, i) => {
       if (b.p && !b.p[i]) return "";
-      const ecart = (b.e || [])[i] || 0;
       const name = (panel.members[i] || {}).name || "";
+      const head = partHeadline(b, i);
+      /* The member's correction on this block, if any ("z":
+       * [code, value] — r/p/c). A removed member's line says so
+       * instead of printing a credited part he no longer has. */
+      const z = b.z && b.z[i];
+      const removed = !!z && z[0] === "r";
       /* One « a apporté » definition per scope, LABELLED
        * (money-model fix, 2026-11-06): a project block's line is
        * that project's apports — « dans ce projet » says so, so
@@ -1303,7 +1593,12 @@ function renderMembers() {
        * (j === null) carries the global figure, the same one the
        * Par membre list prints. */
       let meta;
-      if (b.v) {
+      if (removed) {
+        meta = esc(tt(b.j ? "part.contributed_in_project"
+                          : "part.contributed",
+                      { amount: fmtMoney(apporte) })) +
+          esc(tt("part.removed_suffix"));
+      } else if (b.v) {
         meta = esc(tt("part.prov_credited",
                       { amount: fmtMoney((b.c || [])[i] || 0) })) +
           (apporte ? esc(tt("part.contributed_part_in_project",
@@ -1318,13 +1613,23 @@ function renderMembers() {
           (b.w && b.w[i] ? esc(tt("members.prov_part",
                                   { amount: fmtMoney(b.w[i]) })) : "");
       }
-      return '<div class="row entry-row">' +
+      const chip = z ? ' <span class="adj-chip">' +
+        esc(tt("part.adjusted")) + "</span>" : "";
+      /* Project-block rows are the « Ajuster » tap target
+       * (Landry, 2026-11-07): tapping a member opens the sheet
+       * for THAT member in THAT project — context prefilled,
+       * never asked again. The total block (j === null) is a
+       * sum, not a split: its rows do not open anything. */
+      const tapAttrs = b.j ? ' data-adj-block="' + bi +
+        '" data-adj-member="' + i + '"' : "";
+      return '<div class="row entry-row' + (b.j ? " adj-row" : "") + '"' +
+        tapAttrs + '>' +
         '<div class="entry-main">' +
-          '<span class="entry-line">' + esc(name) + "</span>" +
+          '<span class="entry-line">' + esc(name) + chip + "</span>" +
           '<span class="entry-meta">' + meta + "</span>" +
         "</div>" +
-        '<span class="pill pill-ref" title="' + esc(tt("part.ecart_title")) + '">' +
-          esc(fmtMoney(ecart)) + "</span>" +
+        '<span class="pill pill-ref" title="' + esc(head.title) + '">' +
+          esc(fmtMoney(head.value)) + "</span>" +
       "</div>";
     }).join("");
     const note = b.v
@@ -1333,6 +1638,13 @@ function renderMembers() {
     return '<div class="part-block"><h4 class="part-title">' + title +
       "</h4>" + facts + rows + note + "</div>";
   }).join("");
+  els.partList.querySelectorAll("[data-adj-block]").forEach((row) => {
+    row.addEventListener("click", () => {
+      haptic("impact");
+      openAdjust(Number(row.getAttribute("data-adj-block")),
+                 Number(row.getAttribute("data-adj-member")));
+    });
+  });
 }
 
 /* -------------------------------------------------------------- graphiques */
@@ -1487,8 +1799,14 @@ function memberCardHTML(m) {
     /* Same labelling as the Membres view: project blocks are
      * project-scoped (« dans ce projet »), the total block is
      * the global figure. */
+    const head = partHeadline(b, i);
+    const zc = b.z && b.z[i];
     let meta;
-    if (b.v) {
+    if (zc && zc[0] === "r") {
+      meta = esc(tt("part.contributed_in_project",
+                    { amount: fmtMoney(apporte) })) +
+        esc(tt("part.removed_suffix"));
+    } else if (b.v) {
       meta = esc(tt("part.prov_credited",
                     { amount: fmtMoney((b.c || [])[i] || 0) })) +
         (apporte ? esc(tt("part.contributed_part_in_project",
@@ -1510,8 +1828,8 @@ function memberCardHTML(m) {
     return '<div class="row entry-row"><div class="entry-main">' +
       '<span class="entry-line">' + title + "</span>" +
       '<span class="entry-meta">' + meta + "</span></div>" +
-      '<span class="pill pill-ref" title="' + esc(tt("part.ecart_title")) + '">' +
-      esc(fmtMoney(ecart)) + "</span></div>";
+      '<span class="pill pill-ref" title="' + esc(head.title) + '">' +
+      esc(fmtMoney(head.value)) + "</span></div>";
   }).join("");
   if (blocks) {
     html += '<h3 class="card-title">' + esc(tt("member.participations_title")) + "</h3>" + blocks;

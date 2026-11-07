@@ -341,6 +341,41 @@
       <div class="card">
         <div id="participations-list"></div>
       </div>
+      <p class="hint-note" data-i18n="part.adjust_hint">Touche un membre d'un projet pour ajuster sa participation : le retirer du projet, lui donner une part personnalisée, ou corriger son montant.</p>
+    </section>
+    <section id="adjust-wrap" hidden>
+      <form id="form-adjust" class="entry-form">
+        <h3><svg class="ic"><use href="#i-scale"/></svg> <span data-i18n="adj.title">Ajuster la participation</span></h3>
+        <p class="entry-meta" id="adj-context"></p>
+        <p class="entry-meta" id="adj-current" hidden></p>
+        <div class="adj-opts" id="adj-opts">
+          <button type="button" class="adj-opt" data-kind="retirer">
+            <span class="adj-opt-name" data-i18n="adj.opt_retirer">Retirer du projet</span>
+            <span class="adj-opt-sub" data-i18n="adj.opt_retirer_sub">Il garde ce qu'il a apporté ; les autres se répartissent le reste.</span>
+          </button>
+          <button type="button" class="adj-opt" data-kind="part">
+            <span class="adj-opt-name" data-i18n="adj.opt_part">Part personnalisée</span>
+            <span class="adj-opt-sub" data-i18n="adj.opt_part_sub">Un pourcentage du projet, au lieu du partage égal.</span>
+          </button>
+          <button type="button" class="adj-opt" data-kind="corriger">
+            <span class="adj-opt-name" data-i18n="adj.opt_corriger">Corriger le montant</span>
+            <span class="adj-opt-sub" data-i18n="adj.opt_corriger_sub">Le montant exact de sa part — pour un projet provisoire, de son crédit.</span>
+          </button>
+        </div>
+        <label id="adj-field" hidden><span id="adj-field-label"></span>
+          <input id="adj-input" type="number" inputmode="decimal" min="0">
+        </label>
+        <div id="adj-preview" hidden>
+          <h4 class="adj-preview-title" data-i18n="adj.preview_title">Après l'ajustement</h4>
+          <div id="adj-preview-body"></div>
+        </div>
+        <p class="hint-note" id="adj-error" hidden></p>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" id="adj-back" data-i18n="form.cancel">Annuler</button>
+          <button type="submit" class="btn btn-approve" id="adj-apply" data-i18n="adj.apply">Appliquer</button>
+        </div>
+        <button type="button" class="btn btn-ghost adj-cancel" id="adj-cancel" hidden data-i18n="adj.cancel_adj">Annuler l'ajustement</button>
+      </form>
     </section>
   </div>
 
