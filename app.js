@@ -393,8 +393,8 @@ const I18N = {
     "part.contributed_part_in_project": " · a apporté {amount} dans ce projet",
     "part.contributed": "a apporté {amount}",
     "part.contributed_part": " · a apporté {amount}",
-    "part.equal_share_part": " · part égale {amount}",
-    "part.prov_credited": "part provisoire créditée {amount}",
+    "part.equal_share_part": " · part égale",
+    "part.prov_credited": "part provisoire créditée",
     "part.prov_note": "Attribution provisoire, en parts égales — elle sera confirmée à partir des relevés de transactions.",
     "part.ecart_title": "Écart — repère",
     "part.credited_title": "Part créditée",
@@ -407,11 +407,11 @@ const I18N = {
     "adj.detail_part": "part personnalisée : {value} %",
     "adj.detail_corriger": "montant corrigé : {value}",
     "adj.opt_retirer": "Retirer du projet",
-    "adj.opt_retirer_sub": "Il garde ce qu'il a apporté ; les autres se répartissent le reste.",
+    "adj.opt_retirer_sub": "Le montant se divise entre les membres restants.",
     "adj.opt_part": "Part personnalisée",
-    "adj.opt_part_sub": "Un pourcentage du projet, au lieu du partage égal.",
+    "adj.opt_part_sub": "Un % du projet, au lieu du partage égal.",
     "adj.opt_corriger": "Corriger le montant",
-    "adj.opt_corriger_sub": "Le montant exact de sa part — pour un projet provisoire, de son crédit.",
+    "adj.opt_corriger_sub": "Le montant exact de sa part.",
     "adj.pct_label": "Pourcentage du projet (%)",
     "adj.amount_label": "Montant (FCFA)",
     "adj.preview_title": "Après l'ajustement",
@@ -586,8 +586,8 @@ const I18N = {
     "part.contributed_part_in_project": " · contributed {amount} in this project",
     "part.contributed": "contributed {amount}",
     "part.contributed_part": " · contributed {amount}",
-    "part.equal_share_part": " · equal share {amount}",
-    "part.prov_credited": "provisional share credited {amount}",
+    "part.equal_share_part": " · equal share",
+    "part.prov_credited": "provisional share credited",
     "part.prov_note": "Provisional attribution, in equal shares — it will be confirmed from the transaction records.",
     "part.ecart_title": "Gap — reference",
     "part.credited_title": "Credited share",
@@ -600,11 +600,11 @@ const I18N = {
     "adj.detail_part": "custom share: {value}%",
     "adj.detail_corriger": "corrected amount: {value}",
     "adj.opt_retirer": "Remove from the project",
-    "adj.opt_retirer_sub": "They keep what they contributed; the others split the rest.",
+    "adj.opt_retirer_sub": "The amount is divided between the remaining members.",
     "adj.opt_part": "Custom share",
-    "adj.opt_part_sub": "A percentage of the project, instead of the equal split.",
+    "adj.opt_part_sub": "A % of the project, instead of the equal split.",
     "adj.opt_corriger": "Correct the amount",
-    "adj.opt_corriger_sub": "The exact amount of their share — for a provisional project, of their credit.",
+    "adj.opt_corriger_sub": "The exact amount of their share.",
     "adj.pct_label": "Percentage of the project (%)",
     "adj.amount_label": "Amount (FCFA)",
     "adj.preview_title": "After the adjustment",
@@ -1174,8 +1174,10 @@ els.formApport.addEventListener("submit", (ev) => {
  * Exactly three operations — Retirer du projet · Part
  * personnalisée · Corriger le montant — one decision at a time:
  * the value field appears only for the operation that needs it,
- * and the consequence (every participant's resulting part) is
- * previewed, biggest on the sheet, BEFORE « Appliquer ». Applying
+ * prefilled with the member's current value so the consequence
+ * preview (every participant's resulting part) recalculates live
+ * from the first tap and on every keystroke; « Appliquer » wakes
+ * only when the value actually changes. Applying
  * sends the correction to the bot (no approval step — it applies
  * at once), which logs it in the register's « Ajustements » tab
  * with its author; an existing correction shows at the top of the
@@ -1192,7 +1194,7 @@ function adjDetailText(z) {
 function openAdjust(bi, i) {
   const b = (panel.participations || [])[bi];
   if (!b || !b.j) return;
-  adjState = { bi: bi, i: i, kind: null };
+  adjState = { bi: bi, i: i, kind: null, pristine: true };
   els.adjContext.textContent =
     ((panel.members[i] || {}).name || "") + " — " + b.j;
   const z = b.z && b.z[i];
@@ -1223,7 +1225,16 @@ function selectAdjKind(kind, preset) {
   adjState.kind = kind;
   if (preset !== undefined && preset !== null) {
     els.adjInput.value = preset;
+  } else if (kind === "part" || kind === "corriger") {
+    /* Prefill the member's CURRENT value, so the consequence
+     * preview is live from the very first tap (Landry,
+     * 2026-11-07: "real time when you press some buttons the
+     * calculation reflect automatically") — the field never
+     * opens empty or at 0. The prefill is "pristine": « Appliquer »
+     * stays asleep until the value actually changes. */
+    els.adjInput.value = adjDefaultValue(kind);
   }
+  adjState.pristine = true;
   refreshAdjust();
 }
 
@@ -1233,36 +1244,18 @@ function adjParticipants(b) {
   return idx;
 }
 
-/* The split AFTER the pending correction, computed exactly as the
- * server computes it (core.participations_breakdown): fixed
- * shares/credits first, removed members out of the pot, the
+/* The split produced by an explicit adjustment map `eff`
+ * ({memberIndex: [kind, value]}), computed exactly as the server
+ * computes it (core.participations_breakdown): fixed
+ * shares/credits first, removed members OUT — share 0, the amount
+ * divided among the remaining (Landry, 2026-11-07) — and the
  * unadjusted split the rest equally. Returns {parts, removed,
- * credit} — "credit" marks a provisional block, whose previewed
- * figure is the member's crédit — or null when the pending value
- * is missing or out of range. Negative results ride along so the
- * sheet can flag them (the server refuses them too). */
-function adjCompute() {
-  const b = (panel.participations || [])[adjState.bi];
-  const kind = adjState.kind;
-  if (!kind) return null;
-  let value = null;
-  if (kind !== "retirer") {
-    value = parseFloat(String(els.adjInput.value || "")
-      .replace(/\s/g, "").replace(",", "."));
-    if (isNaN(value)) return null;
-    if (kind === "part" && !(value > 0 && value <= 100)) return null;
-    if (kind === "corriger" &&
-        (value < 0 || value !== Math.round(value))) return null;
-  }
+ * credit}: "parts" holds the ACTIVE members only, "credit" marks
+ * a provisional block, whose figure is the member's crédit.
+ * Negative results ride along so the sheet can flag them (the
+ * server refuses them too). */
+function adjSplit(b, eff) {
   const parts = adjParticipants(b);
-  const eff = {};
-  parts.forEach((j) => {
-    const z = b.z && b.z[j];
-    if (z) {
-      eff[j] = [{ r: "retirer", p: "part", c: "corriger" }[z[0]], z[1]];
-    }
-  });
-  eff[adjState.i] = [kind, value];
   const removed = new Set(
     parts.filter((j) => eff[j] && eff[j][0] === "retirer"));
   const active = parts.filter((j) => !removed.has(j));
@@ -1290,14 +1283,67 @@ function adjCompute() {
     else if (e && e[0] === "part") fixed[j] = total * e[1] / 100;
   });
   const rest = active.filter((j) => !(j in fixed));
-  const removedSum = parts.filter((j) => removed.has(j))
-    .reduce((s, j) => s + ((b.a || [])[j] || 0), 0);
   const restVal = rest.length
-    ? (total - removedSum -
-       Object.values(fixed).reduce((s, v) => s + v, 0)) / rest.length
+    ? (total - Object.values(fixed).reduce((s, v) => s + v, 0)) / rest.length
     : 0;
   active.forEach((j) => { out[j] = (j in fixed) ? fixed[j] : restVal; });
   return { parts: out, removed: removed, credit: false };
+}
+
+/* The block's STORED corrections as an eff map (the panel's "z"
+ * markers, decoded) — the pending member's own excluded by the
+ * callers that overlay it. */
+function adjStoredEff(b) {
+  const eff = {};
+  adjParticipants(b).forEach((j) => {
+    const z = b.z && b.z[j];
+    if (z) {
+      eff[j] = [{ r: "retirer", p: "part", c: "corriger" }[z[0]], z[1]];
+    }
+  });
+  return eff;
+}
+
+/* The value the field opens with for `kind`: the member's part
+ * as it stands NOW (stored corrections applied, pending one
+ * ignored) — a percentage for « part », an amount for
+ * « corriger ». A currently-removed member gets the equal share
+ * he would hold by rejoining the split. */
+function adjDefaultValue(kind) {
+  const b = (panel.participations || [])[adjState.bi];
+  const cur = adjSplit(b, adjStoredEff(b));
+  let mine = cur.parts[adjState.i];
+  const base = b.v ? (b.f || 0)
+    : adjParticipants(b).reduce(
+        (s, j) => s + ((b.a || [])[j] || 0), 0);
+  if (mine === undefined) {
+    const n = Object.keys(cur.parts).length + 1;
+    mine = n ? base / n : 0;
+  }
+  if (kind === "corriger") return String(Math.round(mine));
+  if (!base) return "";
+  return String(Math.round(mine / base * 10000) / 100);
+}
+
+/* The split AFTER the pending correction — the stored
+ * corrections with the sheet's own overlaid — or null when the
+ * pending value is missing or out of range. */
+function adjCompute() {
+  const b = (panel.participations || [])[adjState.bi];
+  const kind = adjState.kind;
+  if (!kind) return null;
+  let value = null;
+  if (kind !== "retirer") {
+    value = parseFloat(String(els.adjInput.value || "")
+      .replace(/\s/g, "").replace(",", "."));
+    if (isNaN(value)) return null;
+    if (kind === "part" && !(value > 0 && value <= 100)) return null;
+    if (kind === "corriger" &&
+        (value < 0 || value !== Math.round(value))) return null;
+  }
+  const eff = adjStoredEff(b);
+  eff[adjState.i] = [kind, value];
+  return adjSplit(b, eff);
 }
 
 function refreshAdjust() {
@@ -1335,6 +1381,18 @@ function refreshAdjust() {
       return '<div class="adj-line"><span>' + esc(name) + "</span>" +
         "<strong>" + esc(label) + "</strong></div>";
     }).join("");
+    /* « Appliquer » wakes only on a REAL change (Landry,
+     * 2026-11-07): while the field still holds its prefilled
+     * current value (pristine), the preview above already shows
+     * the current split — there is nothing to send. « retirer »
+     * carries no value: it is a change unless the member is
+     * already removed from this project. */
+    if (valid && kind === "retirer") {
+      const z = b.z && b.z[adjState.i];
+      if (z && z[0] === "r") valid = false;
+    } else if (valid && adjState.pristine) {
+      valid = false;
+    }
   }
   els.adjApply.disabled = !valid;
 }
@@ -1345,7 +1403,10 @@ els.adjOpts.querySelectorAll(".adj-opt").forEach((o) => {
     selectAdjKind(o.getAttribute("data-kind"));
   });
 });
-els.adjInput.addEventListener("input", refreshAdjust);
+els.adjInput.addEventListener("input", () => {
+  if (adjState) adjState.pristine = false;
+  refreshAdjust();
+});
 els.adjBack.addEventListener("click", closeAdjust);
 els.adjCancel.addEventListener("click", () => {
   if (!adjState) return;
