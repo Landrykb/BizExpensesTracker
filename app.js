@@ -421,6 +421,7 @@ const I18N = {
     "adj.apply": "Appliquer",
     "adj.cancel_adj": "Annuler l'ajustement",
     "adj.invalid": "Cet ajustement laisserait une part négative à un membre — vérifie le montant.",
+    "adj.demo_gate": "Copie de démonstration : ouvre le panneau depuis le bouton « Registre » du bot pour appliquer une correction.",
     "adj.sent": "Correction envoyée au bot.",
     "adj.cancel_sent": "Annulation envoyée au bot.",
     "charts.by_category": "Dépenses par catégorie",
@@ -614,6 +615,7 @@ const I18N = {
     "adj.apply": "Apply",
     "adj.cancel_adj": "Cancel the adjustment",
     "adj.invalid": "This adjustment would leave a member with a negative share — check the amount.",
+    "adj.demo_gate": "Demo copy: open the panel from the bot's « Registre » button to apply a correction.",
     "adj.sent": "Correction sent to the bot.",
     "adj.cancel_sent": "Cancellation sent to the bot.",
     "charts.by_category": "Expenses by category",
@@ -1408,26 +1410,65 @@ els.adjInput.addEventListener("input", () => {
   refreshAdjust();
 });
 els.adjBack.addEventListener("click", closeAdjust);
-els.adjCancel.addEventListener("click", () => {
-  if (!adjState) return;
+
+/* The sheet's corrections travel as a t.me DEEP LINK, not
+ * sendData: sendData is a silent no-op in some launch modes
+ * (observed live 2026-11-07 — the sheet toasted « envoyée »,
+ * the app never closed, and the bot received nothing at all),
+ * while a « ?start=adj_… » link is delivered as an ordinary
+ * /start message in the member's DM in EVERY mode. The link
+ * names the target by INDEX into this panel (block + member)
+ * with a staleness check digit over "project|member" (djb2 —
+ * MUST match miniapp.adjust_check_digit) and carries the
+ * snapshot's action claim (`ac`), which binds it to the member
+ * this panel was minted for; the bot re-validates everything
+ * server-side (claim, indexes, digit, value, simulation) and
+ * answers in the chat with the confirmation card. */
+function adjCheckDigit(s) {
+  let h = 5381;
+  for (let n = 0; n < s.length; n++) {
+    h = ((h * 33) ^ s.charCodeAt(n)) >>> 0;
+  }
+  return ("00000000" + h.toString(16)).slice(-5);
+}
+
+function sendAdjust(letter, valueStr) {
   const b = (panel.participations || [])[adjState.bi];
   const name = (panel.members[adjState.i] || {}).name || "";
-  sendAction("cancel_adjustment", { project: b.j, member: name });
+  const payload = [adjState.bi, adjState.i, letter, valueStr,
+                   adjCheckDigit((b.j || "") + "|" + name)].join(".");
+  const raw = payload + "|" + (panel.ac || "");
+  const b64 = btoa(raw).replace(/\+/g, "-").replace(/\//g, "_")
+    .replace(/=+$/, "");
+  const url = "https://t.me/" +
+    (panel.bu || "bizexpensestracker_bot") + "?start=adj_" + b64;
+  if (tg && tg.openTelegramLink) tg.openTelegramLink(url);
+  else window.location.href = url;
+}
+
+els.adjCancel.addEventListener("click", () => {
+  if (!adjState) return;
+  /* A demo copy cannot correct anything — say so instead of
+   * pretending to send (the 2026-11-07 fake « envoyée »). */
+  if (DEMO) { toast(tt("adj.demo_gate")); return; }
+  sendAdjust("x", "");
   toast(tt("adj.cancel_sent"));
   closeAdjust();
 });
 els.adjForm.addEventListener("submit", (ev) => {
   ev.preventDefault();
   if (!adjState || els.adjApply.disabled) return;
-  const b = (panel.participations || [])[adjState.bi];
-  const name = (panel.members[adjState.i] || {}).name || "";
-  const payload = { project: b.j, member: name, kind: adjState.kind };
+  if (DEMO) { toast(tt("adj.demo_gate")); return; }
+  const letter = { retirer: "r", part: "p", corriger: "c" }[adjState.kind];
   const raw = parseFloat(String(els.adjInput.value || "")
     .replace(/\s/g, "").replace(",", "."));
-  if (adjState.kind === "part") payload.value = raw;
-  else if (adjState.kind === "corriger") payload.value = Math.round(raw);
+  let valueStr = "";
+  if (adjState.kind === "part") valueStr = String(raw);
+  else if (adjState.kind === "corriger") {
+    valueStr = String(Math.round(raw));
+  }
   haptic("notify", "success");
-  sendAction("adjust_participation", payload);
+  sendAdjust(letter, valueStr);
   toast(tt("adj.sent"));
   closeAdjust();
 });
